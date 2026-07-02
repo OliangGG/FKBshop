@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FKB Remap — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#050a12;--sur:#0a1628;--sur2:#0f1f38;--bdr:#1a3a5c;--acc:#0078ff;--acc2:#00c896;--acc3:#ff4466;--acc4:#ffd166;--tx:#e8eaf0;--tx2:#6b8aaa;--grn:#22c55e;--org:#f97316;--red:#ef4444;--blu:#4a9eff}
+body{font-family:'Prompt',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.lw{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,rgba(0,120,255,.1),transparent 60%)}
+.lc{background:var(--sur);border:1px solid var(--bdr);border-radius:20px;padding:36px;width:100%;max-width:340px}
+.ll{text-align:center;margin-bottom:24px}.ll img{width:110px;filter:drop-shadow(0 0 12px rgba(0,120,255,.5))}.ll p{font-size:10px;color:var(--tx2);margin-top:5px;letter-spacing:2px}
+.app{display:none;min-height:100vh}.app.on{display:flex}
+.sb{width:200px;min-height:100vh;background:var(--sur);border-right:1px solid var(--bdr);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:100;transition:.3s}
+.sb-logo{padding:14px;border-bottom:1px solid var(--bdr);text-align:center}.sb-logo img{width:90px;filter:drop-shadow(0 0 7px rgba(0,120,255,.3))}.sb-logo span{display:block;font-size:9px;color:var(--tx2);letter-spacing:2px;margin-top:3px}
+.nav{flex:1;padding:10px 0}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;color:var(--tx2);font-size:12px;font-weight:500;transition:.15s;border-left:2px solid transparent}
+.ni:hover{background:rgba(0,120,255,.07);color:var(--tx)}.ni.on{background:rgba(0,120,255,.12);color:var(--blu);border-left-color:var(--acc)}
+.ni span{font-size:15px;width:20px;text-align:center}
+.sb-ft{padding:12px 14px;border-top:1px solid var(--bdr)}
+.av{width:28px;height:28px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.mn{margin-left:200px;flex:1}.tb{padding:12px 24px;border-bottom:1px solid var(--bdr);background:var(--sur);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}.tb h1{font-size:15px;font-weight:600}
+.ct{padding:20px 24px}.pg{display:none}.pg.on{display:block}
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.sc{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:14px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.c1::before{background:var(--acc)}.sc.c2::before{background:var(--acc2)}.sc.c3::before{background:var(--acc4)}.sc.c4::before{background:var(--acc3)}
+.si{font-size:18px;margin-bottom:5px}.sl{font-size:10px;color:var(--tx2);margin-bottom:2px}.sv{font-size:22px;font-weight:700}
+.tc{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cd{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:16px}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.st{font-size:13px;font-weight:600}
+.btn{padding:7px 13px;border-radius:7px;border:none;cursor:pointer;font-family:'Prompt',sans-serif;font-size:11px;font-weight:500;transition:.15s}
+.bp{background:var(--acc);color:#fff}.bp:hover{background:#0066dd}
+.bs{background:var(--grn);color:#fff}.bd{background:var(--red);color:#fff}
+.bo{background:transparent;border:1px solid var(--bdr);color:var(--tx2)}.bo:hover{border-color:var(--acc);color:var(--blu)}
+.bsm{padding:4px 9px;font-size:10px}
+.sb2{display:flex;align-items:center;gap:7px;background:var(--sur2);border:1px solid var(--bdr);border-radius:7px;padding:7px 11px;width:180px}
+.sb2 input{background:none;border:none;outline:none;color:var(--tx);font-family:'Prompt',sans-serif;font-size:12px;width:100%}
+.sb2 input::placeholder{color:var(--tx2)}
+table{width:100%;border-collapse:collapse}
+th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--tx2);text-transform:uppercase;border-bottom:1px solid var(--bdr)}
+td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(26,58,92,.4)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,120,255,.03)}
+.bge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500}
+.b-blu{background:rgba(0,120,255,.15);color:var(--blu)}.b-grn{background:rgba(34,197,94,.15);color:var(--grn)}
+.b-org{background:rgba(249,115,22,.15);color:var(--org)}.b-pur{background:rgba(139,92,246,.15);color:#a78bfa}
+.b-red{background:rgba(239,68,68,.15);color:var(--red)}.b-gry{background:rgba(107,138,170,.15);color:var(--tx2)}
+.b-tel{background:rgba(0,200,150,.15);color:var(--acc2)}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.mo.on{display:flex}.md{background:var(--sur);border:1px solid var(--bdr);border-radius:14px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.mh{padding:16px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}.mh h3{font-size:13px;font-weight:600}
+.mb{padding:20px}.mf{padding:12px 20px;border-top:1px solid var(--bdr);display:flex;justify-content:flex-end;gap:8px}
+.fg{margin-bottom:12px}.fl{display:block;font-size:11px;font-weight:500;color:var(--tx2);margin-bottom:4px}
+.fi{width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:7px;padding:8px 11px;color:var(--tx);font-family:'Prompt',sans-serif;font-size:12px;outline:none;transition:.15s}
+.fi:focus{border-color:var(--acc)}.fi::placeholder{color:var(--tx2)}
+select.fi option{background:var(--sur2)}.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.vc{display:inline-flex;align-items:center;gap:5px;background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:3px 8px;font-size:11px;margin:2px}
+.vc .pl{font-weight:700;color:var(--acc4)}.hi{background:var(--sur2);border:1px solid var(--bdr);border-radius:9px;padding:11px;margin-bottom:7px}
+.rc{background:var(--sur2);border:1px solid var(--org);border-radius:9px;padding:12px;margin-bottom:8px}
+.bp2{background:#fff;color:#111;border-radius:10px;padding:20px;font-family:'Prompt',sans-serif}
+.bp2 h2{text-align:center;font-size:15px;margin-bottom:2px}.bps{text-align:center;font-size:11px;color:#666;margin-bottom:12px}
+.bpd{border:none;border-top:1px dashed #ccc;margin:8px 0}.bpr{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
+.bpt{font-weight:700;font-size:14px}.bpn{text-align:center;font-size:10px;color:#999;margin-top:8px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--sur2);border:1px solid var(--bdr);border-radius:9px;padding:10px 15px;font-size:12px;z-index:999;transform:translateY(60px);opacity:0;transition:.3s}
+.toast.on{transform:translateY(0);opacity:1}.toast.ok{border-color:var(--grn);color:var(--grn)}.toast.er{border-color:var(--red);color:var(--red)}
+.emp{text-align:center;padding:28px;color:var(--tx2)}.emp-i{font-size:28px;margin-bottom:7px}
+.nd{width:7px;height:7px;border-radius:50%;background:var(--org);display:inline-block;margin-left:4px;vertical-align:middle}
+.qtab{padding:7px 14px;border-radius:8px;border:1px solid var(--bdr);cursor:pointer;font-family:'Prompt',sans-serif;font-size:11px;font-weight:500;color:var(--tx2);background:var(--sur);white-space:nowrap;transition:.15s}
+.qtab:hover{border-color:var(--acc);color:var(--blu)}.qtab.on{background:rgba(0,120,255,.15);border-color:var(--acc);color:var(--blu)}
+@media(max-width:768px){.sb{transform:translateX(-200px)}.sb.open{transform:translateX(0)}.mn{margin-left:0}.sg{grid-template-columns:repeat(2,1fr)}.tc{grid-template-columns:1fr}.fr{grid-template-columns:1fr}.fr3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="lw" id="LW">
+  <div class="lc">
+    <div class="ll"><img id="loginLogo" src="" alt="FKB"><p>ADMIN PANEL</p></div>
+    <div class="fg"><label class="fl">Email</label><input class="fi" id="le" type="email" placeholder="admin@fkb.com"></div>
+    <div class="fg"><label class="fl">รหัสผ่าน</label><input class="fi" id="lp" type="password" placeholder="••••••••"></div>
+    <button class="btn bp" style="width:100%;padding:10px;font-size:13px;margin-top:4px" id="loginBtn">เข้าสู่ระบบ</button>
+    <div id="le2" style="color:var(--red);font-size:11px;text-align:center;margin-top:8px;display:none"></div>
+  </div>
+</div>
+
+<div class="app" id="APP">
+  <aside class="sb" id="SB">
+    <div class="sb-logo"><img id="sbLogo" src="" alt="FKB"><span>ADMIN</span></div>
+    <nav class="nav">
+      <div class="ni on" onclick="goPage('dashboard',this)"><span>🏠</span>หน้าหลัก</div>
+      <div class="ni" onclick="goPage('customers',this)"><span>👤</span>ลูกค้า</div>
+      <div class="ni" onclick="goPage('vehicles',this)"><span>🏍️</span>รถทั้งหมด</div>
+      <div class="ni" onclick="goPage('services',this)"><span>🔧</span>เซอร์วิส</div>
+      <div class="ni" onclick="goPage('products',this)"><span>📦</span>สินค้า</div>
+      <div class="ni" onclick="goPage('queue',this)"><span>⚙️</span>คิวงาน<span class="nd" id="qDot" style="display:none"></span></div>
+      <div class="ni" onclick="goPage('history',this)"><span>📋</span>ประวัติงาน</div>
+      <div class="ni" onclick="goPage('billing',this)"><span>🧾</span>บิล</div>
+      <div class="ni" onclick="goPage('registrations',this)"><span>📝</span>คำขอสมัคร<span class="nd" id="rDot" style="display:none"></span></div>
+    </nav>
+    <div class="sb-ft">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="av" id="avEl">A</div>
+        <div><div style="font-size:11px;font-weight:500" id="uEmail">-</div><div style="font-size:10px;color:var(--tx2)">แอดมิน</div></div>
+      </div>
+      <button class="btn bo bsm" style="width:100%" id="logoutBtn">ออกจากระบบ</button>
+    </div>
+  </aside>
+
+  <div class="mn">
+    <div class="tb">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn bo bsm" id="menuBtn" onclick="document.getElementById('SB').classList.toggle('open')" style="display:none">☰</button>
+        <h1 id="pgTitle">หน้าหลัก</h1>
+      </div>
+      <div id="tDate" style="font-size:11px;color:var(--tx2)"></div>
+    </div>
+    <div class="ct">
+
+      <div class="pg on" id="pg-dashboard">
+        <div class="sg">
+          <div class="sc c1"><div class="si">👥</div><div class="sl">ลูกค้า</div><div class="sv" id="s1">-</div></div>
+          <div class="sc c2"><div class="si">🏍️</div><div class="sl">รถ</div><div class="sv" id="s2">-</div></div>
+          <div class="sc c3"><div class="si">💰</div><div class="sl">รายได้รวม</div><div class="sv" id="s3">-</div></div>
+          <div class="sc c4"><div class="si">⚙️</div><div class="sl">งานค้าง</div><div class="sv" id="s4">-</div></div>
+        </div>
+        <div class="tc">
+          <div class="cd"><div class="sh"><span class="st">ลูกค้าล่าสุด</span><button class="btn bp bsm" onclick="openM('addCust')">+ เพิ่ม</button></div><div id="dCusts"></div></div>
+          <div class="cd"><div class="sh"><span class="st">งานค้างอยู่</span><button class="btn bp bsm" onclick="goPage('queue',document.querySelector('.ni:nth-child(6))'))">ดูทั้งหมด</button></div><div id="dBooks"></div></div>
+        </div>
+      </div>
+
+      <div class="pg" id="pg-customers">
+        <div class="sh" style="margin-bottom:16px"><div class="sb2"><span>🔍</span><input type="text" placeholder="ค้นหา..." id="csrch" oninput="rCusts()"></div><button class="btn bp" onclick="openM('addCust')">+ เพิ่มลูกค้า</button></div>
+        <div class="cd"><table><thead><tr><th>ชื่อ</th><th>เบอร์</th><th>รถ</th><th>งาน</th><th></th></tr></thead><tbody id="cTbl"></tbody></table></div>
+      </div>
+
+      <div class="pg" id="pg-vehicles">
+        <div class="sh" style="margin-bottom:16px"><div class="sb2"><span>🔍</span><input type="text" placeholder="ค้นหา..." id="vsrch" oninput="rVehs()"></div><button class="btn bp" onclick="openM('addVeh')">+ เพิ่มรถ</button></div>
+        <div class="cd"><table><thead><tr><th>ทะเบียน</th><th>ยี่ห้อ/รุ่น</th><th>สี/ปี</th><th>เจ้าของ</th><th>งาน</th><th></th></tr></thead><tbody id="vTbl"></tbody></table></div>
+      </div>
+
+      <div class="pg" id="pg-services">
+        <div class="sh" style="margin-bottom:16px"><span class="st">ประวัติเซอร์วิส</span><button class="btn bp" onclick="openM('addSvc')">+ บันทึกเซอร์วิส</button></div>
+        <div class="cd"><div style="overflow-x:auto"><table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th>รถ</th><th>ประเภท</th><th>กม.เปลี่ยน</th><th>กม.ต่อไป</th><th>ราคา</th><th></th></tr></thead><tbody id="sTbl"></tbody></table></div></div>
+      </div>
+
+      <div class="pg" id="pg-products">
+        <div class="sh" style="margin-bottom:16px"><div class="sb2"><span>🔍</span><input type="text" placeholder="ค้นหา..." id="psrch" oninput="rProds()"></div><button class="btn bp" onclick="openM('addProd')">+ เพิ่มสินค้า</button></div>
+        <div id="pGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px"></div>
+      </div>
+
+      <div class="pg" id="pg-queue">
+        <div class="sh" style="margin-bottom:14px"><span class="st">สถานะงาน</span><button class="btn bp" onclick="openM('addQueue')">+ งานใหม่</button></div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px">
+          <button class="qtab on" id="qt-new" onclick="filterQueue('new',this)">🆕 งานใหม่ <span id="cnt-new" class="bge b-blu" style="margin-left:4px">0</span></button>
+          <button class="qtab" id="qt-working" onclick="filterQueue('working',this)">🔧 กำลังทำ <span id="cnt-working" class="bge b-org" style="margin-left:4px">0</span></button>
+          <button class="qtab" id="qt-done" onclick="filterQueue('done',this)">✅ เสร็จแล้ว <span id="cnt-done" class="bge b-grn" style="margin-left:4px">0</span></button>
+          <button class="qtab" id="qt-cancelled" onclick="filterQueue('cancelled',this)">❌ ยกเลิก <span id="cnt-cancelled" class="bge b-gry" style="margin-left:4px">0</span></button>
+        </div>
+        <div id="qList"></div>
+      </div>
+
+      <div class="pg" id="pg-history">
+        <div class="sh" style="margin-bottom:16px"><span class="st">ประวัติงาน</span><button class="btn bp" onclick="openM('addJob')">+ บันทึกงาน</button></div>
+        <div class="cd"><div style="overflow-x:auto"><table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th>รถ</th><th>บริการ</th><th>ราคา</th><th>โน้ต</th><th></th></tr></thead><tbody id="hTbl"></tbody></table></div></div>
+      </div>
+
+      <div class="pg" id="pg-billing">
+        <div class="tc">
+          <div class="cd">
+            <div class="st" style="margin-bottom:12px">สร้างบิล</div>
+            <div class="fg"><label class="fl">ลูกค้า</label><select class="fi" id="biCust" onchange="updBillVeh()"><option value="">-- เลือก --</option></select></div>
+            <div class="fg"><label class="fl">รถ</label><select class="fi" id="biVeh" onchange="updBillPrev()"><option value="">-- เลือก --</option></select></div>
+            <div id="biItems"></div>
+            <button class="btn bo bsm" style="margin-top:8px" onclick="openM('addBiItem')">+ เพิ่มรายการ</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr)"><span style="font-size:13px;font-weight:600">รวม</span><span style="font-size:20px;font-weight:700;color:var(--acc4)" id="biTotal">฿0</span></div>
+            <div style="display:flex;gap:8px;margin-top:12px"><button class="btn bs" onclick="printBill()">🖨️ พิมพ์</button><button class="btn bo" onclick="clearBill()">ล้าง</button></div>
+          </div>
+          <div>
+            <div class="st" style="margin-bottom:10px">ตัวอย่างบิล</div>
+            <div class="bp2" id="billBox"><h2>🏍️ FKB Remap</h2><div class="bps">รับทำเครื่อง | รีแมพ | ปรับจูน</div><hr class="bpd"><div id="bpRows"><div style="text-align:center;color:#aaa;font-size:11px">ยังไม่มีรายการ</div></div><hr class="bpd"><div class="bpr bpt"><span>รวมทั้งหมด</span><span id="bpTotal">฿0</span></div><div class="bpn">ขอบคุณที่ใช้บริการ FKB Remap 🙏</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pg" id="pg-registrations">
+        <div class="sh" style="margin-bottom:16px"><span class="st">คำขอสมัครสมาชิก</span><span class="bge b-org" id="rCnt">0 รายการ</span></div>
+        <div id="rList"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="mo" id="mo-addCust"><div class="md">
+  <div class="mh"><h3>เพิ่มลูกค้าใหม่</h3><button class="btn bo bsm" onclick="closeM('addCust')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">ชื่อ *</label><input class="fi" id="cN" placeholder="ชื่อลูกค้า"></div>
+    <div class="fr"><div class="fg"><label class="fl">เบอร์โทร</label><input class="fi" id="cP" placeholder="08x-xxx-xxxx"></div><div class="fg"><label class="fl">Email (login)</label><input class="fi" id="cE" type="email" placeholder="email@email.com"></div></div>
+    <div class="fg"><label class="fl">หมายเหตุ</label><textarea class="fi" id="cNo" rows="2" style="resize:vertical"></textarea></div>
+    <div style="border-top:1px solid var(--bdr);padding-top:11px;margin-top:4px"><div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--acc2)">🏍️ เพิ่มรถ (ไม่บังคับ)</div>
+    <div class="fr"><div class="fg"><label class="fl">ทะเบียน</label><input class="fi" id="cPl" placeholder="กก 1234"></div><div class="fg"><label class="fl">ยี่ห้อ</label><input class="fi" id="cBr" placeholder="Honda"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">รุ่น</label><input class="fi" id="cMo" placeholder="PCX 160"></div><div class="fg"><label class="fl">สี</label><input class="fi" id="cCo" placeholder="น้ำเงิน"></div></div></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addCust')">ยกเลิก</button><button class="btn bp" onclick="saveCust()">บันทึก</button></div>
+</div></div>
+
+<div class="mo" id="mo-addVeh"><div class="md">
+  <div class="mh"><h3>เพิ่มรถ</h3><button class="btn bo bsm" onclick="closeM('addVeh')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">เจ้าของ *</label><select class="fi" id="vCu"><option value="">-- เลือก --</option></select></div>
+    <div class="fr"><div class="fg"><label class="fl">ทะเบียน *</label><input class="fi" id="vPl" placeholder="กก 1234"></div><div class="fg"><label class="fl">ยี่ห้อ</label><input class="fi" id="vBr" placeholder="Honda"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">รุ่น</label><input class="fi" id="vMo" placeholder="PCX 160"></div><div class="fg"><label class="fl">สี</label><input class="fi" id="vCo" placeholder="น้ำเงิน"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">ปี</label><input class="fi" id="vYr" placeholder="2022"></div><div class="fg"><label class="fl">หมายเหตุ</label><input class="fi" id="vNo" placeholder="โน้ต"></div></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addVeh')">ยกเลิก</button><button class="btn bp" onclick="saveVeh()">บันทึก</button></div>
+</div></div>
+
+<div class="mo" id="mo-addSvc"><div class="md">
+  <div class="mh"><h3>บันทึกเซอร์วิส</h3><button class="btn bo bsm" onclick="closeM('addSvc')">✕</button></div>
+  <div class="mb">
+    <div class="fr"><div class="fg"><label class="fl">ลูกค้า *</label><select class="fi" id="svCu" onchange="updSvcVeh()"><option value="">-- เลือก --</option></select></div><div class="fg"><label class="fl">รถ</label><select class="fi" id="svVe"><option value="">-- เลือกรถ --</option></select></div></div>
+    <div class="fr"><div class="fg"><label class="fl">วันที่</label><input class="fi" id="svDt" type="date"></div><div class="fg"><label class="fl">ประเภท *</label><select class="fi" id="svTy"><option>ถ่ายน้ำมันเครื่อง</option><option>เปลี่ยนเบรกหน้า</option><option>เปลี่ยนเบรกหลัง</option><option>เปลี่ยนยาง</option><option>รีแมพ ECU</option><option>ปรับจูนเครื่อง</option><option>ทำเครื่องชั้นบน</option><option>เปลี่ยนสายพาน</option><option>เปลี่ยนหัวเทียน</option><option>อื่นๆ</option></select></div></div>
+    <div class="fr3"><div class="fg"><label class="fl">กม.ตอนเปลี่ยน</label><input class="fi" id="svKi" type="number" placeholder="15000"></div><div class="fg"><label class="fl">กม.ครั้งต่อไป</label><input class="fi" id="svKn" type="number" placeholder="16500"></div><div class="fg"><label class="fl">ราคา</label><input class="fi" id="svPr" type="number" placeholder="0"></div></div>
+    <div class="fg"><label class="fl">หมายเหตุ</label><input class="fi" id="svNo" placeholder="รายละเอียด"></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addSvc')">ยกเลิก</button><button class="btn bp" onclick="saveSvc()">บันทึก</button></div>
+</div></div>
+
+<div class="mo" id="mo-addProd"><div class="md">
+  <div class="mh"><h3>เพิ่มสินค้า</h3><button class="btn bo bsm" onclick="closeM('addProd')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">ชื่อ *</label><input class="fi" id="pNm" placeholder="ชื่อสินค้า"></div>
+    <div class="fr"><div class="fg"><label class="fl">ราคา *</label><input class="fi" id="pPr" type="number" placeholder="0"></div><div class="fg"><label class="fl">หมวดหมู่</label><div style="display:flex;gap:6px"><select class="fi" id="pCat" style="flex:1"></select><button type="button" class="btn bo bsm" onclick="addCat()">+</button></div></div></div>
+    <div class="fg"><label class="fl">หมายเหตุ</label><input class="fi" id="pNo" placeholder="รายละเอียด"></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addProd')">ยกเลิก</button><button class="btn bp" onclick="saveProd()">บันทึก</button></div>
+</div></div>
+
+<div class="mo" id="mo-addQueue"><div class="md">
+  <div class="mh"><h3>เพิ่มงานใหม่</h3><button class="btn bo bsm" onclick="closeM('addQueue')">✕</button></div>
+  <div class="mb">
+    <div class="fr"><div class="fg"><label class="fl">ลูกค้า *</label><select class="fi" id="qqCu" onchange="updQueueVeh()"><option value="">-- เลือก --</option></select></div><div class="fg"><label class="fl">รถ</label><select class="fi" id="qqVe"><option value="">-- เลือกรถ --</option></select></div></div>
+    <div class="fg"><label class="fl">วันที่รับ</label><input class="fi" id="qqDt" type="date"></div>
+    <div class="fg"><label class="fl">รายการงาน (คั่นด้วย ,)</label><input class="fi" id="qqSv" placeholder="รีแมพ, ถ่ายน้ำมัน"></div>
+    <div class="fg"><label class="fl">ราคาโดยประมาณ</label><input class="fi" id="qqPr" type="number" placeholder="0"></div>
+    <div class="fg"><label class="fl">หมายเหตุ</label><input class="fi" id="qqNo" placeholder="โน้ต"></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addQueue')">ยกเลิก</button><button class="btn bp" onclick="saveQueue()">เพิ่มงาน</button></div>
+</div></div>
+
+<div class="mo" id="mo-editQueue"><div class="md">
+  <div class="mh"><h3>แก้ไขงาน</h3><button class="btn bo bsm" onclick="closeM('editQueue')">✕</button></div>
+  <div class="mb">
+    <input type="hidden" id="eqId">
+    <div class="fg"><label class="fl">รายการงาน (คั่นด้วย ,)</label><input class="fi" id="eqSv" placeholder="รีแมพ, ถ่ายน้ำมัน"></div>
+    <div class="fr"><div class="fg"><label class="fl">ราคา</label><input class="fi" id="eqPr" type="number" placeholder="0"></div><div class="fg"><label class="fl">สถานะ</label><select class="fi" id="eqSt"><option value="new">🆕 งานใหม่</option><option value="working">🔧 กำลังทำ</option><option value="done">✅ เสร็จแล้ว</option><option value="cancelled">❌ ยกเลิก</option></select></div></div>
+    <div class="fg"><label class="fl">หมายเหตุ</label><input class="fi" id="eqNo" placeholder="โน้ต"></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('editQueue')">ยกเลิก</button><button class="btn bp" onclick="updateQueue()">บันทึก</button></div>
+</div></div>
+
+<div class="mo" id="mo-addJob"><div class="md">
+  <div class="mh"><h3>บันทึกงาน</h3><button class="btn bo bsm" onclick="closeM('addJob')">✕</button></div>
+  <div class="mb">
+    <div class="fr"><div class="fg"><label class="fl">ลูกค้า *</label><select class="fi" id="jCu" onchange="updJobVeh()"><option value="">-- เลือก --</option></select></div><div class="fg"><label class="fl">รถ</label><select class="fi" id="jVe"><option value="">-- เลือกรถ --</option></select></div></div>
+    <div class="fg"><label class="fl">วันที่</label><input class="fi" id="jDt" type="date"></div>
+    <div class="fg"><label class="fl">รายการ (คั่นด้วย ,)</label><input class="fi" id="jSv" placeholder="รีแมพ, ถ่ายน้ำมัน"></div>
+    <div class="fg"><label class="fl">ราคารวม *</label><input class="fi" id="jPr" type="number" placeholder="0"></div>
+    <div class="fg"><label class="fl">หมายเหตุ</label><input class="fi" id="jNo" placeholder="โน้ต"></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addJob')">ยกเลิก</button><button class="btn bp" onclick="saveJob()">บันทึก</button></div>
+</div></div>
+
+<div class="mo" id="mo-custD"><div class="md" style="max-width:560px">
+  <div class="mh"><h3>ข้อมูลลูกค้า</h3><button class="btn bo bsm" onclick="closeM('custD')">✕</button></div>
+  <div class="mb" id="custDBody"></div>
+  <div class="mf">
+    <button class="btn bo bsm" onclick="addVehFor()">+ รถ</button>
+    <button class="btn bo bsm" onclick="addSvcFor()">+ เซอร์วิส</button>
+    <button class="btn bp bsm" onclick="addJobFor()">+ งาน</button>
+    <button class="btn bo" onclick="closeM('custD')">ปิด</button>
+  </div>
+</div></div>
+
+<div class="mo" id="mo-addBiItem"><div class="md">
+  <div class="mh"><h3>เพิ่มรายการในบิล</h3><button class="btn bo bsm" onclick="closeM('addBiItem')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">เลือกจากสินค้า</label><select class="fi" id="biProd" onchange="fillBi()"><option value="">-- เลือก --</option></select></div>
+    <div class="fg"><label class="fl">หรือพิมพ์เอง</label><input class="fi" id="biNm" placeholder="ชื่อรายการ"></div>
+    <div class="fr"><div class="fg"><label class="fl">ราคา</label><input class="fi" id="biPr" type="number" placeholder="0"></div><div class="fg"><label class="fl">จำนวน</label><input class="fi" id="biQt" type="number" value="1" min="1"></div></div>
+  </div>
+  <div class="mf"><button class="btn bo" onclick="closeM('addBiItem')">ยกเลิก</button><button class="btn bp" onclick="addBiItem()">เพิ่ม</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== LOGO =====
+(function(){
+  var L="data:image/webp;base64,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";
+  ["loginLogo","sbLogo"].forEach(function(id){var el=document.getElementById(id);if(el)el.src=L;});
+})();
+
+// ===== SUPABASE =====
+var _sb=supabase.createClient("https://ytktcoaanlxfxliiexot.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0a3Rjb2Fhbmx4ZnhsaWlleG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NjQ0MDQsImV4cCI6MjA5ODA0MDQwNH0.UtGIOqXopqiJ6cnrWA4FefFt_S61g7tq314nat4Xbb0");
+var custs=[],prods=[],jobs=[],books=[],vehs=[],regs=[],svcs=[],queues=[];
+var biItems=[],curCustId=null,curQFilter="new";
+var cats=JSON.parse(localStorage.getItem("fkb_cats")||'["น้ำมัน/สารหล่อลื่น","อะไหล่","ค่าแรง","รีแมพ","อื่นๆ"]');
+
+// AUTH
+document.getElementById("loginBtn").onclick=function(){
+  var e=document.getElementById("le").value.trim();
+  var p=document.getElementById("lp").value;
+  _sb.auth.signInWithPassword({email:e,password:p}).then(function(r){
+    if(r.error){var el=document.getElementById("le2");el.textContent="ไม่สำเร็จ: "+r.error.message;el.style.display="block";}
+  });
+};
+document.getElementById("lp").addEventListener("keydown",function(e){if(e.key==="Enter")document.getElementById("loginBtn").click();});
+document.getElementById("logoutBtn").onclick=function(){_sb.auth.signOut().then(function(){location.reload();});};
+_sb.auth.onAuthStateChange(function(ev,session){
+  if(session){
+    document.getElementById("LW").style.display="none";
+    document.getElementById("APP").classList.add("on");
+    document.getElementById("uEmail").textContent=session.user.email;
+    document.getElementById("avEl").textContent=session.user.email[0].toUpperCase();
+    loadAll();
+  }
+});
+
+// LOAD
+function loadAll(){Promise.all([loadC(),loadP(),loadJ(),loadB(),loadV(),loadR(),loadS(),loadQ()]).then(renderAll);}
+function loadC(){return _sb.from("customers").select("*").order("created_at",{ascending:false}).then(function(r){custs=r.data||[];});}
+function loadP(){return _sb.from("products").select("*").order("name").then(function(r){prods=r.data||[];});}
+function loadJ(){return _sb.from("jobs").select("*").order("date",{ascending:false}).then(function(r){jobs=r.data||[];});}
+function loadB(){return _sb.from("bookings").select("*").order("date",{ascending:false}).then(function(r){books=r.data||[];});}
+function loadV(){return _sb.from("vehicles").select("*").order("created_at",{ascending:false}).then(function(r){vehs=r.data||[];});}
+function loadR(){return _sb.from("registrations").select("*").order("created_at",{ascending:false}).then(function(r){regs=r.data||[];});}
+function loadS(){return _sb.from("service_records").select("*").order("date",{ascending:false}).then(function(r){svcs=r.data||[];});}
+function loadQ(){return _sb.from("work_queues").select("*").order("created_at",{ascending:false}).then(function(r){queues=r.data||[];});}
+
+function renderAll(){rStats();rDash();rCusts();rVehs();rProds();rHist();rSvcs();rQueue();rRegs();popSels();}
+
+function rStats(){
+  document.getElementById("s1").textContent=custs.length;
+  document.getElementById("s2").textContent=vehs.length;
+  var rev=jobs.reduce(function(s,j){return s+(parseFloat(j.price)||0);},0)+svcs.reduce(function(s,r){return s+(parseFloat(r.price)||0);},0);
+  document.getElementById("s3").textContent="฿"+rev.toLocaleString();
+  var active=queues.filter(function(q){return q.status!=="done"&&q.status!=="cancelled";});
+  document.getElementById("s4").textContent=active.length;
+  var pend=regs.filter(function(r){return r.status==="pending";}).length;
+  document.getElementById("rDot").style.display=pend?"inline-block":"none";
+  document.getElementById("rCnt").textContent=pend+" รายการ";
+  document.getElementById("qDot").style.display=active.length?"inline-block":"none";
+}
+
+function rDash(){
+  var el=document.getElementById("dCusts");
+  if(!custs.length){el.innerHTML="<div class=\"emp\"><div class=\"emp-i\">👤</div><p>ยังไม่มีลูกค้า</p></div>";}
+  else{
+    el.innerHTML=custs.slice(0,5).map(function(c){
+      var cv=vehs.filter(function(v){return v.customer_id===c.id;});
+      return "<div class=\"datarow\" data-id=\""+c.id+"\" style=\"display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr)\">"+
+        "<div style=\"width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0\">"+c.name.charAt(0)+"</div>"+
+        "<div style=\"flex:1\"><div style=\"font-size:12px;font-weight:600\">"+c.name+"</div><div style=\"font-size:10px;color:var(--tx2)\">"+(cv.map(function(v){return "🏍️"+v.plate;}).join(" ")||"ไม่มีรถ")+"</div></div>"+
+        "<button class=\"btn bo bsm viewbtn\">ดู</button></div>";
+    }).join("");
+    el.querySelectorAll(".datarow").forEach(function(row){
+      row.querySelector(".viewbtn").onclick=function(){openCustD(row.dataset.id);};
+    });
+  }
+  var el2=document.getElementById("dBooks");
+  var active=queues.filter(function(q){return q.status!=="done"&&q.status!=="cancelled";});
+  if(!active.length){el2.innerHTML="<div class=\"emp\"><div class=\"emp-i\">⚙️</div><p>ไม่มีงานค้าง</p></div>";}
+  else{
+    el2.innerHTML=active.slice(0,5).map(function(q){
+      var c=custs.find(function(x){return x.id===q.customer_id;});
+      var v=vehs.find(function(x){return x.id===q.vehicle_id;});
+      var sIcon={new:"🆕",working:"🔧",done:"✅",cancelled:"❌"};
+      return "<div style=\"display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr)\">"+
+        "<div style=\"font-size:18px\">"+(sIcon[q.status]||"🔧")+"</div>"+
+        "<div style=\"flex:1\"><div style=\"font-size:12px;font-weight:600\">"+(c?c.name:"ไม่ระบุ")+(v?" · "+v.plate:"")+"</div>"+
+        "<div style=\"font-size:11px;color:var(--tx2)\">"+(q.services||"")+"</div></div></div>";
+    }).join("");
+  }
+}
+
+function rCusts(){
+  var q=(document.getElementById("csrch")||{value:""}).value.toLowerCase();
+  var list=custs.filter(function(c){return c.name.toLowerCase().includes(q)||(c.phone||"").includes(q);});
+  var tb=document.getElementById("cTbl");
+  if(!list.length){tb.innerHTML="<tr><td colspan=\"5\" style=\"text-align:center;padding:20px;color:var(--tx2)\">ไม่พบ</td></tr>";return;}
+  tb.innerHTML=list.map(function(c){
+    var cv=vehs.filter(function(v){return v.customer_id===c.id;});
+    return "<tr data-cid=\""+c.id+"\">"+
+      "<td><b>"+c.name+"</b><br><span style=\"font-size:10px;color:var(--tx2)\">"+(c.phone||"")+"</span></td>"+
+      "<td>"+(c.phone||"-")+"</td>"+
+      "<td>"+(cv.length?cv.map(function(v){return "<span class=\"vc\"><span class=\"pl\">"+v.plate+"</span>"+(v.brand?" "+v.brand:"")+"</span>";}).join(""):"<span style=\"color:var(--tx2);font-size:11px\">ไม่มีรถ</span>")+"</td>"+
+      "<td><span class=\"bge b-blu\">"+jobs.filter(function(j){return j.customer_id===c.id;}).length+" งาน</span></td>"+
+      "<td><div style=\"display:flex;gap:5px\"><button class=\"btn bo bsm vbtn\">ดู</button><button class=\"btn bd bsm dbtn\">ลบ</button></div></td></tr>";
+  }).join("");
+  tb.querySelectorAll("tr[data-cid]").forEach(function(row){
+    var id=row.dataset.cid;
+    row.querySelector(".vbtn").onclick=function(){openCustD(id);};
+    row.querySelector(".dbtn").onclick=function(){delCust(id);};
+  });
+}
+
+function rVehs(){
+  var q=(document.getElementById("vsrch")||{value:""}).value.toLowerCase();
+  var list=vehs.filter(function(v){return (v.plate||"").toLowerCase().includes(q)||(v.brand||"").toLowerCase().includes(q);});
+  var tb=document.getElementById("vTbl");
+  if(!list.length){tb.innerHTML="<tr><td colspan=\"6\" style=\"text-align:center;padding:20px;color:var(--tx2)\">ไม่พบ</td></tr>";return;}
+  tb.innerHTML=list.map(function(v){
+    var c=custs.find(function(x){return x.id===v.customer_id;});
+    return "<tr data-vid=\""+v.id+"\">"+
+      "<td><span class=\"bge b-tel\" style=\"font-size:12px;padding:4px 10px\">"+v.plate+"</span></td>"+
+      "<td><b>"+(v.brand||"")+"</b> "+(v.model||"")+"</td>"+
+      "<td>"+(v.color||"-")+(v.year?" / "+v.year:"")+"</td>"+
+      "<td>"+(c?"<b>"+c.name+"</b>":"ไม่ระบุ")+"</td>"+
+      "<td><span class=\"bge b-blu\">"+jobs.filter(function(j){return j.vehicle_id===v.id;}).length+" งาน</span></td>"+
+      "<td><button class=\"btn bd bsm dbtn\">ลบ</button></td></tr>";
+  }).join("");
+  tb.querySelectorAll("tr[data-vid]").forEach(function(row){
+    var id=row.dataset.vid;
+    row.querySelector(".dbtn").onclick=function(){delVeh(id);};
+  });
+}
+
+function rProds(){
+  var q=(document.getElementById("psrch")||{value:""}).value.toLowerCase();
+  var list=prods.filter(function(p){return p.name.toLowerCase().includes(q);});
+  var grid=document.getElementById("pGrid");
+  if(!list.length){grid.innerHTML="<div class=\"emp\" style=\"grid-column:1/-1\"><div class=\"emp-i\">📦</div><p>ไม่มีสินค้า</p></div>";return;}
+  grid.innerHTML=list.map(function(p){
+    return "<div class=\"pcard\" data-pid=\""+p.id+"\" style=\"background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:12px;position:relative\">"+
+      "<div style=\"position:absolute;top:8px;right:8px\"><span class=\"bge b-gry\" style=\"font-size:10px\">"+(p.category||"")+"</span></div>"+
+      "<div style=\"font-size:12px;font-weight:600;margin-bottom:2px;padding-right:55px\">"+p.name+"</div>"+
+      "<div style=\"font-size:10px;color:var(--tx2);margin-bottom:7px\">"+(p.note||"")+"</div>"+
+      "<div style=\"font-size:16px;font-weight:700;color:var(--acc4)\">฿"+parseFloat(p.price).toLocaleString()+"</div>"+
+      "<div style=\"margin-top:8px\"><button class=\"btn bd bsm dbtn\">ลบ</button></div></div>";
+  }).join("");
+  grid.querySelectorAll(".pcard").forEach(function(card){
+    var id=card.dataset.pid;
+    card.querySelector(".dbtn").onclick=function(){delProd(id);};
+  });
+}
+
+function rHist(){
+  var tb=document.getElementById("hTbl");
+  if(!jobs.length){tb.innerHTML="<tr><td colspan=\"7\" style=\"text-align:center;padding:20px;color:var(--tx2)\">ยังไม่มี</td></tr>";return;}
+  tb.innerHTML=jobs.map(function(j){
+    var c=custs.find(function(x){return x.id===j.customer_id;});
+    var v=vehs.find(function(x){return x.id===j.vehicle_id;});
+    return "<tr data-jid=\""+j.id+"\">"+
+      "<td style=\"font-size:11px;color:var(--tx2)\">"+(j.date||"")+"</td>"+
+      "<td><b>"+(c?c.name:"ไม่ระบุ")+"</b></td>"+
+      "<td>"+(v?"<span class=\"bge b-tel\">"+v.plate+"</span>":"")+"</td>"+
+      "<td>"+(j.services||"").split(",").map(function(s){return s.trim()?"<span class=\"bge b-blu\" style=\"margin:2px\">"+s.trim()+"</span>":"";}).join("")+"</td>"+
+      "<td style=\"color:var(--acc4);font-weight:600\">฿"+parseFloat(j.price||0).toLocaleString()+"</td>"+
+      "<td style=\"font-size:11px;color:var(--tx2)\">"+(j.note||"-")+"</td>"+
+      "<td><button class=\"btn bd bsm dbtn\">ลบ</button></td></tr>";
+  }).join("");
+  tb.querySelectorAll("tr[data-jid]").forEach(function(row){
+    var id=row.dataset.jid;
+    row.querySelector(".dbtn").onclick=function(){delJob(id);};
+  });
+}
+
+function rSvcs(){
+  var tb=document.getElementById("sTbl");
+  if(!svcs.length){tb.innerHTML="<tr><td colspan=\"8\" style=\"text-align:center;padding:20px;color:var(--tx2)\">ยังไม่มี</td></tr>";return;}
+  tb.innerHTML=svcs.map(function(s){
+    var c=custs.find(function(x){return x.id===s.customer_id;});
+    var v=vehs.find(function(x){return x.id===s.vehicle_id;});
+    return "<tr data-sid=\""+s.id+"\">"+
+      "<td style=\"font-size:11px;color:var(--tx2)\">"+(s.date||"")+"</td>"+
+      "<td><b>"+(c?c.name:"ไม่ระบุ")+"</b></td>"+
+      "<td>"+(v?"<span class=\"bge b-tel\">"+v.plate+"</span>":"")+"</td>"+
+      "<td><span class=\"bge b-blu\">"+(s.service_type||"")+"</span></td>"+
+      "<td>"+(s.mileage_in?s.mileage_in.toLocaleString()+" กม.":"")+"</td>"+
+      "<td style=\"color:var(--acc4)\">"+(s.next_mileage?s.next_mileage.toLocaleString()+" กม.":"")+"</td>"+
+      "<td style=\"color:var(--acc4);font-weight:600\">"+(s.price?"฿"+parseFloat(s.price).toLocaleString():"")+"</td>"+
+      "<td><button class=\"btn bd bsm dbtn\">ลบ</button></td></tr>";
+  }).join("");
+  tb.querySelectorAll("tr[data-sid]").forEach(function(row){
+    var id=row.dataset.sid;
+    row.querySelector(".dbtn").onclick=function(){delSvc(id);};
+  });
+}
+
+function filterQueue(status,el){
+  curQFilter=status;
+  document.querySelectorAll(".qtab").forEach(function(t){t.classList.remove("on");});
+  if(el)el.classList.add("on");
+  rQueue();
+}
+
+function rQueue(){
+  var counts={new:0,working:0,done:0,cancelled:0};
+  queues.forEach(function(q){if(counts[q.status]!==undefined)counts[q.status]++;});
+  Object.keys(counts).forEach(function(s){var el=document.getElementById("cnt-"+s);if(el)el.textContent=counts[s];});
+  var dot=document.getElementById("qDot");
+  if(dot)dot.style.display=(counts.new+counts.working)>0?"inline-block":"none";
+  var el=document.getElementById("qList");if(!el)return;
+  var list=queues.filter(function(q){return q.status===curQFilter;});
+  var msgs={new:"ยังไม่มีงานใหม่",working:"ไม่มีงานที่กำลังทำ",done:"ยังไม่มีงานเสร็จ",cancelled:"ไม่มีงานยกเลิก"};
+  if(!list.length){el.innerHTML="<div class=\"emp\"><div class=\"emp-i\">"+(curQFilter==="done"?"✅":curQFilter==="cancelled"?"❌":"🔧")+"</div><p>"+(msgs[curQFilter]||"ไม่มีข้อมูล")+"</p></div>";return;}
+  var sBadge={new:"<span class=\"bge b-blu\">🆕 งานใหม่</span>",working:"<span class=\"bge b-org\">🔧 กำลังทำ</span>",done:"<span class=\"bge b-grn\">✅ เสร็จแล้ว</span>",cancelled:"<span class=\"bge b-gry\">❌ ยกเลิก</span>"};
+  el.innerHTML=list.map(function(q){
+    var c=custs.find(function(x){return x.id===q.customer_id;});
+    var v=vehs.find(function(x){return x.id===q.vehicle_id;});
+    var s=q.status||"new";
+    return "<div class=\"qcard\" data-qid=\""+q.id+"\" style=\"background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:16px;margin-bottom:10px\">"+
+      "<div style=\"display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px\">"+
+      "<div style=\"display:flex;align-items:center;gap:10px\">"+
+      "<div style=\"width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0\">"+(c?c.name.charAt(0):"?")+"</div>"+
+      "<div><div style=\"font-size:13px;font-weight:700\">"+(c?c.name:"ไม่ระบุ")+"</div>"+
+      "<div style=\"font-size:11px;color:var(--tx2)\">"+(v?"🏍️ "+v.plate+" "+(v.brand||""):"")+(q.date?" · "+q.date:"")+"</div></div></div>"+
+      (sBadge[s]||"")+"</div>"+
+      "<div style=\"display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px\">"+
+      (q.services||"ไม่ระบุ").split(",").map(function(sv){return sv.trim()?"<span class=\"bge b-blu\">"+sv.trim()+"</span>":"";}).join("")+"</div>"+
+      (q.note?"<div style=\"font-size:11px;color:var(--tx2);margin-bottom:8px\">📝 "+q.note+"</div>":"")+
+      "<div style=\"display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--bdr)\">"+
+      "<span style=\"font-size:14px;font-weight:700;color:var(--acc4)\">"+(q.price?"฿"+parseFloat(q.price).toLocaleString():"ยังไม่ระบุ")+"</span>"+
+      "<div class=\"qbtns\" style=\"display:flex;gap:6px;flex-wrap:wrap\"></div></div></div>";
+  }).join("");
+  list.forEach(function(q){
+    var id=q.id;var s=q.status||"new";
+    var card=el.querySelector(".qcard[data-qid=\""+id+"\"]");if(!card)return;
+    var btnsEl=card.querySelector(".qbtns");if(!btnsEl)return;
+    if(s==="new"){
+      addBtn(btnsEl,"bp","✓ รับงาน",function(){moveQ(id,"working");});
+      addBtn(btnsEl,"bd","✕ ยกเลิก",function(){moveQ(id,"cancelled");});
+    }else if(s==="working"){
+      addBtn(btnsEl,"bs","✅ เสร็จ",function(){finishQ(id);});
+      addBtn(btnsEl,"bo","↩ คืน",function(){moveQ(id,"new");});
+    }else{
+      addBtn(btnsEl,"bo","↩ เปิดใหม่",function(){moveQ(id,"new");});
+    }
+    addBtn(btnsEl,"bo","✏️",function(){editQueueById(id);});
+    addBtn(btnsEl,"bd","🗑️",function(){delQueue(id);});
+  });
+}
+
+function addBtn(parent,cls,txt,fn){
+  var b=document.createElement("button");
+  b.className="btn "+cls+" bsm";b.textContent=txt;b.onclick=fn;
+  parent.appendChild(b);
+}
+
+function moveQ(id,status){
+  _sb.from("work_queues").update({status:status}).eq("id",id).then(function(){
+    var msgs={working:"รับงานแล้ว 🔧",new:"คืนสถานะแล้ว",cancelled:"ยกเลิกแล้ว"};
+    toast(msgs[status]||"อัปเดตแล้ว");
+    loadQ().then(function(){rQueue();rStats();});
+  });
+}
+
+function finishQ(id){
+  if(!confirm("ยืนยันเสร็จงาน? จะบันทึกลงประวัติงานอัตโนมัติ"))return;
+  var q=queues.find(function(x){return x.id===id;});if(!q)return;
+  _sb.from("work_queues").update({status:"done"}).eq("id",id).then(function(){
+    _sb.from("jobs").insert({customer_id:q.customer_id,vehicle_id:q.vehicle_id,date:q.date||today(),services:q.services,price:q.price||0,note:q.note,status:"done"}).then(function(){
+      toast("เสร็จงาน! บันทึกประวัติแล้ว ✅");
+      Promise.all([loadQ(),loadJ()]).then(function(){filterQueue("done",document.getElementById("qt-done"));rHist();rStats();});
+    });
+  });
+}
+
+function saveQueue(){
+  var cid=document.getElementById("qqCu").value;
+  if(!cid){toast("กรุณาเลือกลูกค้า","er");return;}
+  _sb.from("work_queues").insert({customer_id:cid,vehicle_id:document.getElementById("qqVe").value||null,date:document.getElementById("qqDt").value||today(),services:document.getElementById("qqSv").value.trim(),price:parseFloat(document.getElementById("qqPr").value)||null,status:"new",note:document.getElementById("qqNo").value.trim()}).then(function(){
+    closeM("addQueue");toast("เพิ่มงานใหม่แล้ว ✅");
+    ["qqSv","qqPr","qqNo"].forEach(function(i){document.getElementById(i).value="";});
+    loadQ().then(function(){filterQueue("new",document.getElementById("qt-new"));rStats();});
+  });
+}
+
+function editQueueById(id){
+  var q=queues.find(function(x){return x.id===id;});if(!q)return;
+  document.getElementById("eqId").value=id;document.getElementById("eqSv").value=q.services||"";
+  document.getElementById("eqPr").value=q.price||"";document.getElementById("eqSt").value=q.status||"new";
+  document.getElementById("eqNo").value=q.note||"";openM("editQueue");
+}
+
+function updateQueue(){
+  var id=document.getElementById("eqId").value;
+  _sb.from("work_queues").update({services:document.getElementById("eqSv").value.trim(),price:parseFloat(document.getElementById("eqPr").value)||null,status:document.getElementById("eqSt").value,note:document.getElementById("eqNo").value.trim()}).eq("id",id).then(function(){
+    closeM("editQueue");toast("อัปเดตแล้ว ✅");loadQ().then(function(){rQueue();rStats();});
+  });
+}
+
+function delQueue(id){if(!confirm("ลบงานนี้?"))return;_sb.from("work_queues").delete().eq("id",id).then(function(){toast("ลบแล้ว");loadQ().then(function(){rQueue();rStats();});});}
+
+function rRegs(){
+  var el=document.getElementById("rList");
+  var pend=regs.filter(function(item){return item.status==="pending";});
+  if(!pend.length){el.innerHTML="<div class=\"emp\"><div class=\"emp-i\">✅</div><p>ไม่มีคำขอรอ</p></div>";return;}
+  el.innerHTML=pend.map(function(item){
+    return "<div class=\"rc\" data-rid=\""+item.id+"\">"+
+      "<div style=\"display:flex;justify-content:space-between;align-items:flex-start\">"+
+      "<div><div style=\"font-size:13px;font-weight:700\">"+item.name+"</div>"+
+      "<div style=\"font-size:11px;color:var(--tx2);margin-top:2px\">"+item.email+" · "+(item.phone||"ไม่มีเบอร์")+"</div>"+
+      (item.plate?"<div style=\"margin-top:5px\"><span class=\"bge b-tel\">🏍️ "+item.plate+"</span> "+(item.brand||"")+" "+(item.model||"")+(item.color?" · "+item.color:"")+(item.year?" ปี "+item.year:"")+"</div>":"")+
+      "</div><div style=\"font-size:10px;color:var(--tx2)\">"+new Date(item.created_at).toLocaleDateString("th-TH")+"</div></div>"+
+      "<div style=\"display:flex;gap:7px;margin-top:10px\">"+
+      "<button class=\"btn bs bsm appbtn\">✓ Approve</button>"+
+      "<button class=\"btn bd bsm rejbtn\">✕ ปฏิเสธ</button>"+
+      "</div></div>";
+  }).join("");
+  el.querySelectorAll(".rc").forEach(function(card){
+    var id=card.dataset.rid;
+    card.querySelector(".appbtn").onclick=function(){approveReg(id);};
+    card.querySelector(".rejbtn").onclick=function(){rejectReg(id);};
+  });
+}
+
+function openCustD(id){
+  curCustId=id;
+  var c=custs.find(function(x){return x.id===id;});if(!c)return;
+  var cv=vehs.filter(function(v){return v.customer_id===id;});
+  var cj=jobs.filter(function(j){return j.customer_id===id;}).sort(function(a,b){return a.date<b.date?1:-1;});
+  var cs=svcs.filter(function(s){return s.customer_id===id;}).sort(function(a,b){return a.date<b.date?1:-1;});
+  var total=cj.reduce(function(s,j){return s+(parseFloat(j.price)||0);},0)+cs.reduce(function(s,r){return s+(parseFloat(r.price)||0);},0);
+  var html="<div style=\"display:flex;align-items:center;gap:12px;background:var(--sur2);border-radius:10px;padding:14px;margin-bottom:14px\">"+
+    "<div style=\"width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0\">"+c.name.charAt(0)+"</div>"+
+    "<div style=\"flex:1\"><div style=\"font-size:15px;font-weight:700\">"+c.name+"</div><div style=\"font-size:12px;color:var(--tx2)\">"+(c.phone||"")+(c.email?" · "+c.email:"")+"</div>"+(c.note?"<div style=\"font-size:11px;color:var(--tx2);margin-top:2px\">📝 "+c.note+"</div>":"")+"</div>"+
+    "<div style=\"text-align:right\"><div style=\"font-size:18px;font-weight:700;color:var(--acc4)\">฿"+total.toLocaleString()+"</div><div style=\"font-size:10px;color:var(--tx2)\">"+(cj.length+cs.length)+" รายการ</div></div></div>";
+  html+="<div style=\"font-size:12px;font-weight:600;margin-bottom:7px\">🏍️ รถ</div>";
+  html+="<div style=\"margin-bottom:12px\">"+(cv.length?cv.map(function(v){return "<span class=\"vc\"><span class=\"pl\">"+v.plate+"</span> "+(v.brand||"")+" "+(v.model||"")+"</span>";}).join(""):"<span style=\"color:var(--tx2);font-size:11px\">ไม่มีรถ</span>")+"</div>";
+  html+="<div style=\"font-size:12px;font-weight:600;margin-bottom:7px\">📋 งานล่าสุด</div>";
+  html+=cj.length?cj.slice(0,3).map(function(j){
+    var v=vehs.find(function(x){return x.id===j.vehicle_id;});
+    return "<div class=\"hi\"><div style=\"display:flex;justify-content:space-between;margin-bottom:5px\">"+
+      "<span style=\"font-size:11px;color:var(--tx2)\">📅 "+(j.date||"")+(v?" · "+v.plate:"")+"</span>"+
+      "<span style=\"font-size:13px;font-weight:700;color:var(--acc4)\">฿"+parseFloat(j.price||0).toLocaleString()+"</span></div>"+
+      "<div style=\"display:flex;flex-wrap:wrap;gap:4px\">"+(j.services||"").split(",").map(function(s){return s.trim()?"<span class=\"bge b-blu\">"+s.trim()+"</span>":"";}).join("")+"</div></div>";
+  }).join(""):"<div style=\"color:var(--tx2);font-size:11px;padding:5px 0\">ยังไม่มี</div>";
+  document.getElementById("custDBody").innerHTML=html;
+  openM("custD");
+}
+
+function addVehFor(){closeM("custD");setTimeout(function(){popSels();document.getElementById("vCu").value=curCustId;openM("addVeh");},150);}
+function addSvcFor(){closeM("custD");setTimeout(function(){popSels();document.getElementById("svCu").value=curCustId;updSvcVeh();document.getElementById("svDt").value=today();openM("addSvc");},150);}
+function addJobFor(){closeM("custD");setTimeout(function(){popSels();document.getElementById("jCu").value=curCustId;updJobVeh();document.getElementById("jDt").value=today();openM("addJob");},150);}
+
+function saveCust(){
+  var name=document.getElementById("cN").value.trim();
+  if(!name){toast("กรุณากรอกชื่อ","er");return;}
+  _sb.from("customers").insert({name:name,phone:document.getElementById("cP").value.trim(),email:document.getElementById("cE").value.trim(),note:document.getElementById("cNo").value.trim()}).select().single().then(function(res){
+    if(res.error){toast("เกิดข้อผิดพลาด","er");return;}
+    var plate=document.getElementById("cPl").value.trim();
+    if(plate&&res.data){_sb.from("vehicles").insert({customer_id:res.data.id,plate:plate,brand:document.getElementById("cBr").value.trim(),model:document.getElementById("cMo").value.trim(),color:document.getElementById("cCo").value.trim()});}
+    closeM("addCust");toast("เพิ่มลูกค้าแล้ว ✅");
+    ["cN","cP","cE","cNo","cPl","cBr","cMo","cCo"].forEach(function(i){document.getElementById(i).value="";});
+    loadC().then(function(){loadV().then(function(){renderAll();});});
+  });
+}
+
+function saveVeh(){
+  var cid=document.getElementById("vCu").value,plate=document.getElementById("vPl").value.trim();
+  if(!cid||!plate){toast("กรุณาเลือกเจ้าของและกรอกทะเบียน","er");return;}
+  _sb.from("vehicles").insert({customer_id:cid,plate:plate,brand:document.getElementById("vBr").value.trim(),model:document.getElementById("vMo").value.trim(),color:document.getElementById("vCo").value.trim(),year:document.getElementById("vYr").value.trim(),note:document.getElementById("vNo").value.trim()}).then(function(){closeM("addVeh");toast("เพิ่มรถแล้ว ✅");loadV().then(renderAll);});
+}
+
+function saveSvc(){
+  var cid=document.getElementById("svCu").value,type=document.getElementById("svTy").value;
+  if(!cid||!type){toast("กรุณาเลือกลูกค้า","er");return;}
+  _sb.from("service_records").insert({customer_id:cid,vehicle_id:document.getElementById("svVe").value||null,date:document.getElementById("svDt").value||today(),service_type:type,mileage_in:parseInt(document.getElementById("svKi").value)||null,next_mileage:parseInt(document.getElementById("svKn").value)||null,price:parseFloat(document.getElementById("svPr").value)||null,note:document.getElementById("svNo").value.trim()}).then(function(){closeM("addSvc");closeM("custD");toast("บันทึกเซอร์วิสแล้ว ✅");loadS().then(renderAll);});
+}
+
+function saveProd(){
+  var name=document.getElementById("pNm").value.trim(),price=parseFloat(document.getElementById("pPr").value);
+  if(!name||isNaN(price)){toast("กรุณากรอกชื่อและราคา","er");return;}
+  _sb.from("products").insert({name:name,price:price,category:document.getElementById("pCat").value,note:document.getElementById("pNo").value.trim()}).then(function(){closeM("addProd");toast("เพิ่มสินค้าแล้ว ✅");["pNm","pPr","pNo"].forEach(function(i){document.getElementById(i).value="";});loadP().then(renderAll);});
+}
+
+function saveBook(){
+  var cid=document.getElementById("bkCu").value,date=document.getElementById("bkDt").value;
+  if(!cid||!date){toast("กรุณาเลือกลูกค้าและวันที่","er");return;}
+  var svc=document.getElementById("bkSv").value.trim();
+  var note=document.getElementById("bkNo").value.trim();
+  var vid=document.getElementById("bkVe").value||null;
+  _sb.from("bookings").insert({customer_id:cid,vehicle_id:vid,date:date,time:document.getElementById("bkTm").value,service:svc,note:note,status:"pending"}).then(function(){
+    _sb.from("work_queues").insert({customer_id:cid,vehicle_id:vid,date:date,services:svc,status:"new",note:"[จากนัดหมาย] "+note}).then(function(){
+      closeM("addBook");toast("นัดหมายแล้ว — อยู่ในคิวงานแล้ว ✅");
+      Promise.all([loadB(),loadQ()]).then(function(){renderAll();filterQueue("new",document.getElementById("qt-new"));});
+    });
+  });
+}
+
+function saveJob(){
+  var cid=document.getElementById("jCu").value,price=parseFloat(document.getElementById("jPr").value);
+  if(!cid||isNaN(price)){toast("กรุณาเลือกลูกค้าและกรอกราคา","er");return;}
+  _sb.from("jobs").insert({customer_id:cid,vehicle_id:document.getElementById("jVe").value||null,date:document.getElementById("jDt").value||today(),services:document.getElementById("jSv").value.trim(),price:price,note:document.getElementById("jNo").value.trim(),status:"done"}).then(function(){closeM("addJob");closeM("custD");toast("บันทึกงานแล้ว ✅");loadJ().then(renderAll);});
+}
+
+function approveReg(id){
+  var item=regs.find(function(x){return x.id===id;});if(!item)return;
+  if(!confirm("Approve "+item.name+"?\nระบบจะสร้าง account และข้อมูลรถให้อัตโนมัติ"))return;
+  _sb.auth.signUp({email:item.email,password:item.password||("FKB"+Math.random().toString(36).slice(2,8))}).then(function(){
+    _sb.from("customers").insert({name:item.name,phone:item.phone,email:item.email,note:(item.model||"")}).select().single().then(function(cr){
+      if(cr.error){toast("สร้างข้อมูลไม่ได้","er");return;}
+      var done=function(){_sb.from("registrations").update({status:"approved"}).eq("id",id).then(function(){toast("Approve แล้ว! ลูกค้าล็อคอินได้เลย ✅");loadAll();});};
+      if(item.plate&&cr.data){_sb.from("vehicles").insert({customer_id:cr.data.id,plate:item.plate,brand:item.brand||"",model:item.model||"",color:item.color||"",year:item.year||""}).then(done);}
+      else done();
+    });
+  });
+}
+
+function rejectReg(id){_sb.from("registrations").update({status:"rejected"}).eq("id",id).then(function(){toast("ปฏิเสธแล้ว");loadR().then(renderAll);});}
+function delCust(id){if(!confirm("ลบลูกค้านี้?"))return;_sb.from("customers").delete().eq("id",id).then(function(){loadAll();});}
+function delVeh(id){if(!confirm("ลบรถนี้?"))return;_sb.from("vehicles").delete().eq("id",id).then(function(){loadV().then(renderAll);});}
+function delProd(id){if(!confirm("ลบ?"))return;_sb.from("products").delete().eq("id",id).then(function(){loadP().then(renderAll);});}
+function delJob(id){if(!confirm("ลบ?"))return;_sb.from("jobs").delete().eq("id",id).then(function(){loadJ().then(renderAll);});}
+function delSvc(id){if(!confirm("ลบ?"))return;_sb.from("service_records").delete().eq("id",id).then(function(){loadS().then(renderAll);});}
+
+function popSels(){
+  ["bkCu","jCu","vCu","svCu","qqCu"].forEach(function(sid){
+    var el=document.getElementById(sid);if(!el)return;
+    var v=el.value;
+    el.innerHTML="<option value=''>-- เลือก --</option>"+custs.map(function(c){return "<option value='"+c.id+"'>"+c.name+"</option>";}).join("");
+    el.value=v;
+  });
+  var bc=document.getElementById("biCust");
+  if(bc){var v=bc.value;bc.innerHTML="<option value=''>-- เลือก --</option>"+custs.map(function(c){return "<option value='"+c.id+"'>"+c.name+"</option>";}).join("");bc.value=v;}
+  var bp=document.getElementById("biProd");
+  if(bp){bp.innerHTML="<option value=''>-- เลือกสินค้า --</option>"+prods.map(function(p){return "<option value='"+p.id+"'>"+p.name+" (฿"+parseFloat(p.price).toLocaleString()+")</option>";}).join("");}
+  rCatSel();
+}
+
+function updVehSel(custId,selId){
+  var el=document.getElementById(selId);if(!el)return;
+  var cv=vehs.filter(function(v){return v.customer_id===custId;});
+  el.innerHTML="<option value=''>-- เลือกรถ --</option>"+cv.map(function(v){return "<option value='"+v.id+"'>"+v.plate+(v.brand?" - "+v.brand:"")+"</option>";}).join("");
+}
+function updBookVeh(){updVehSel(document.getElementById("bkCu").value,"bkVe");}
+function updJobVeh(){updVehSel(document.getElementById("jCu").value,"jVe");}
+function updSvcVeh(){updVehSel(document.getElementById("svCu").value,"svVe");}
+function updBillVeh(){updVehSel(document.getElementById("biCust").value,"biVeh");updBillPrev();}
+function updQueueVeh(){updVehSel(document.getElementById("qqCu").value,"qqVe");}
+
+function rCatSel(){var el=document.getElementById("pCat");if(!el)return;var v=el.value;el.innerHTML=cats.map(function(c){return "<option value='"+c+"'>"+c+"</option>";}).join("");if(v&&cats.includes(v))el.value=v;}
+function addCat(){var name=prompt("ชื่อหมวดหมู่ใหม่:");if(!name||!name.trim())return;if(cats.includes(name.trim())){alert("มีแล้ว");return;}cats.push(name.trim());localStorage.setItem("fkb_cats",JSON.stringify(cats));rCatSel();document.getElementById("pCat").value=name.trim();toast("เพิ่มหมวดหมู่แล้ว ✅");}
+
+function fillBi(){var p=prods.find(function(x){return x.id===document.getElementById("biProd").value;});if(p){document.getElementById("biNm").value=p.name;document.getElementById("biPr").value=p.price;}}
+
+function addBiItem(){
+  var name=document.getElementById("biNm").value.trim(),price=parseFloat(document.getElementById("biPr").value)||0,qty=parseInt(document.getElementById("biQt").value)||1;
+  if(!name){toast("กรุณากรอกชื่อ","er");return;}
+  biItems.push({name:name,price:price,qty:qty});closeM("addBiItem");
+  document.getElementById("biNm").value="";document.getElementById("biPr").value="";document.getElementById("biQt").value=1;
+  updBillPrev();
+}
+
+function remBiItem(i){biItems.splice(i,1);updBillPrev();}
+
+function updBillPrev(){
+  var total=biItems.reduce(function(s,i){return s+i.price*i.qty;},0);
+  var el=document.getElementById("biItems");
+  el.innerHTML=biItems.length?biItems.map(function(item,idx){
+    return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bdr)\">"+
+      "<div><div style=\"font-size:12px\">"+item.name+"</div><div style=\"font-size:10px;color:var(--tx2)\">฿"+item.price.toLocaleString()+" × "+item.qty+"</div></div>"+
+      "<div style=\"display:flex;align-items:center;gap:7px\"><span style=\"font-weight:600;font-size:12px\">฿"+(item.price*item.qty).toLocaleString()+"</span>"+
+      "<button class=\"btn bd bsm rmbtn\" data-idx=\""+idx+"\">✕</button></div></div>";
+  }).join(""):"<div style=\"color:var(--tx2);font-size:11px;padding:5px 0\">ยังไม่มีรายการ</div>";
+  el.querySelectorAll(".rmbtn").forEach(function(btn){btn.onclick=function(){remBiItem(parseInt(this.dataset.idx));};});
+  document.getElementById("biTotal").textContent="฿"+total.toLocaleString();
+  var c=custs.find(function(x){return x.id===document.getElementById("biCust").value;});
+  var v=vehs.find(function(x){return x.id===document.getElementById("biVeh").value;});
+  var d=new Date();
+  document.getElementById("bpRows").innerHTML=
+    (c?"<div class=\"bpr\"><span>ลูกค้า</span><span>"+c.name+"</span></div>":"")+
+    (v?"<div class=\"bpr\"><span>ทะเบียน</span><span>"+v.plate+" "+(v.brand||"")+" "+(v.model||"")+"</span></div>":"")+
+    "<div class=\"bpr\" style=\"font-size:10px;color:#888\"><span>วันที่</span><span>"+d.getDate()+"/"+(d.getMonth()+1)+"/"+(d.getFullYear()+543)+"</span></div><hr class=\"bpd\">"+
+    (biItems.length?biItems.map(function(item){return "<div class=\"bpr\"><span>"+item.name+(item.qty>1?" ×"+item.qty:"")+"</span><span>฿"+(item.price*item.qty).toLocaleString()+"</span></div>";}).join(""):"<div style=\"text-align:center;color:#aaa;font-size:11px\">ยังไม่มีรายการ</div>");
+  document.getElementById("bpTotal").textContent="฿"+total.toLocaleString();
+}
+
+function clearBill(){biItems=[];updBillPrev();}
+
+function printBill(){
+  var w=window.open("","_blank");
+  var c=document.getElementById("billBox").innerHTML;
+  var h="<!DOCTYPE html><html><head><title>FKB Bill</title><meta charset=\"UTF-8\"><link href=\"https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap\" rel=\"stylesheet\"><style>body{font-family:Prompt,sans-serif;padding:26px;max-width:320px;margin:0 auto}h2{text-align:center;margin-bottom:2px}.bps{text-align:center;color:#666;font-size:11px;margin-bottom:11px}.bpd{border:none;border-top:1px dashed #ccc;margin:8px 0}.bpr{display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px}.bpt{font-weight:700;font-size:14px}.bpn{text-align:center;font-size:10px;color:#999;margin-top:8px}</style></head><body>"+c+"</body></html>";
+  w.document.write(h);w.document.close();w.print();
+}
+
+function openM(id){
+  if(["addBook","addJob","addVeh","addSvc","addQueue"].includes(id))popSels();
+  if(id==="addBiItem")popSels();
+  if(id==="addProd")rCatSel();
+  var dates={addJob:"jDt",addBook:"bkDt",addSvc:"svDt",addQueue:"qqDt"};
+  if(dates[id])document.getElementById(dates[id]).value=today();
+  document.getElementById("mo-"+id).classList.add("on");
+}
+function closeM(id){document.getElementById("mo-"+id).classList.remove("on");}
+document.querySelectorAll(".mo").forEach(function(m){m.addEventListener("click",function(e){if(e.target===m)m.classList.remove("on");});});
+
+var pgNames={dashboard:"หน้าหลัก",customers:"ลูกค้า",vehicles:"รถทั้งหมด",services:"ประวัติเซอร์วิส",products:"สินค้า",queue:"คิวงาน",history:"ประวัติงาน",billing:"บิล",registrations:"คำขอสมัคร"};
+function goPage(id,el){
+  document.querySelectorAll(".pg").forEach(function(p){p.classList.remove("on");});
+  document.querySelectorAll(".ni").forEach(function(n){n.classList.remove("on");});
+  document.getElementById("pg-"+id).classList.add("on");
+  if(el)el.classList.add("on");
+  document.getElementById("pgTitle").textContent=pgNames[id]||id;
+  if(id==="billing")popSels();
+}
+function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function toast(msg,type){var t=document.getElementById("toast");t.textContent=msg;t.className="toast on "+(type==="er"?"er":"ok");setTimeout(function(){t.classList.remove("on");},2500);}
+function updDate(){var d=new Date();var D=["อา","จ","อ","พ","พฤ","ศ","ส"];document.getElementById("tDate").textContent=D[d.getDay()]+" "+d.getDate()+"/"+(d.getMonth()+1)+"/"+(d.getFullYear()+543)+"  "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
+updDate();setInterval(updDate,30000);
+function chkMob(){document.getElementById("menuBtn").style.display=window.innerWidth<=768?"flex":"none";}
+window.addEventListener("resize",chkMob);chkMob();
+</script>
+</body>
+</html>
