@@ -311,8 +311,8 @@ public class AfrLoggerForm : Form
             RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.AutoSizeToAllHeaders,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             SelectionMode = DataGridViewSelectionMode.CellSelect,
-            DefaultCellStyle = { Font = new Font("Consolas", 7.5f) },
-            RowTemplate = { Height = 18 },
+            DefaultCellStyle = { Font = new Font("Consolas", 9.5f), Alignment = DataGridViewContentAlignment.MiddleCenter },
+            RowTemplate = { Height = 26 },
             ShowCellErrors = false, // avoids a known WinForms crash ("Cell is not in a DataGridView")
             ShowRowErrors = false,  // when the mouse hovers a cell right as Columns/Rows get rebuilt
             ShowEditingIcon = false,
@@ -320,10 +320,14 @@ public class AfrLoggerForm : Form
         _grid.ColumnHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
         _grid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Accent;
         _grid.ColumnHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
+        _grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         _grid.RowHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
         _grid.RowHeadersDefaultCellStyle.ForeColor = Theme.Accent;
         _grid.RowHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.EnableHeadersVisualStyles = false;
+        _grid.TopLeftHeaderCell.Value = "RPM ⟍ TPS";
+        _grid.TopLeftHeaderCell.Style.Font = new Font(Theme.UiFont, FontStyle.Bold);
+        _grid.TopLeftHeaderCell.Style.ForeColor = Theme.Accent;
         _grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
         _grid.CellPainting += Grid_CellPainting;
 
@@ -361,7 +365,7 @@ public class AfrLoggerForm : Form
         _grid.Columns.Clear();
         _grid.Rows.Clear();
         _lastHighlighted = null;
-        _grid.RowHeadersWidth = 55;
+        _grid.RowHeadersWidth = 62;
 
         for (int t = 0; t < TpsBreakpoints.Length; t++)
         {
@@ -370,7 +374,7 @@ public class AfrLoggerForm : Form
             {
                 Name = $"tps_{t}",
                 HeaderText = tpsValue.ToString("0.0") + "°",
-                Width = 38,
+                Width = 52,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
             };
             _grid.Columns.Add(col);
