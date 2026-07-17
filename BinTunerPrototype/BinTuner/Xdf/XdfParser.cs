@@ -169,20 +169,32 @@ public static class XdfParser
         return math?.Attribute("equation")?.Value.Trim() ?? "X";
     }
 
-    /// <returns>(address, elementSizeBits, signed, bigEndian) or (null, 8, false, false) if no EMBEDDEDDATA present.</returns>
+    /// <returns>(address, elementSizeBits, signed, bigEndian) or (null, 8, false, false) if no EMBEDDEDDATA/address present.</returns>
     private static (int? address, int sizeBits, bool signed, bool bigEndian) ParseEmbeddedData(XElement parent)
     {
         var el = parent.Element("EMBEDDEDDATA");
         if (el == null)
             return (null, 8, false, false);
 
-        int address = ParseIntFlexible(el.Attribute("mmedaddress")?.Value ?? "0");
-        int sizeBits = ParseIntFlexible(el.Attribute("mmedelementsizebits")?.Value ?? "8");
-        int typeFlags = ParseIntFlexible(el.Attribute("mmedTypeFlags")?.Value ?? "0");
+        var addressAttr = GetAttrCaseInsensitive(el, "mmedaddress");
+        if (addressAttr == null)
+            return (null, 8, false, false); // e.g. TunerPro's dummy 1-cell "MODIFY" placeholder axis — no real backing address
+
+        int address = ParseIntFlexible(addressAttr);
+        int sizeBits = ParseIntFlexible(GetAttrCaseInsensitive(el, "mmedelementsizebits") ?? "8");
+        int typeFlags = ParseIntFlexible(GetAttrCaseInsensitive(el, "mmedtypeflags") ?? "0");
         bool signed = (typeFlags & 0x01) != 0;
-        bool bigEndian = (typeFlags & 0x02) != 0;
+        // Per TunerPro's format, bit 0x02 means "LSB first" (little-endian); its absence means
+        // MSB first (big-endian), matching this XDF's own <DEFAULTS lsbfirst="0"/>. Verified against
+        // real Honda K3MF-T01/K2TA-T02 XDFs where every mmedtypeflags="0x02" 16-bit table is
+        // byte-exact little-endian.
+        bool lsbFirst = (typeFlags & 0x02) != 0;
+        bool bigEndian = !lsbFirst;
         return (address, sizeBits <= 0 ? 8 : sizeBits, signed, bigEndian);
     }
+
+    private static string? GetAttrCaseInsensitive(XElement el, string name) =>
+        el.Attributes().FirstOrDefault(a => string.Equals(a.Name.LocalName, name, StringComparison.OrdinalIgnoreCase))?.Value;
 
     private static int ParseIntFlexible(string s)
     {
