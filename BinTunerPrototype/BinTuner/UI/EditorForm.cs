@@ -74,6 +74,7 @@ public class EditorForm : Form
         };
 
         var treeCard = Theme.CardPanel("รายการพารามิเตอร์ (Parameter Tree)", out var treeBody);
+        treeCard.Dock = DockStyle.Fill;
         treeBody.Padding = new Padding(2);
         treeBody.Controls.Add(_tree);
 
@@ -132,12 +133,14 @@ public class EditorForm : Form
         _flagPanel.Controls.AddRange(new Control[] { _chkFlag, _lblFlagInfo, lblFlagWarning });
 
         var gridCard = Theme.CardPanel("ตารางค่า / จูน", out var gridBody);
+        gridCard.Dock = DockStyle.Fill;
         gridBody.Controls.Add(_grid);
         gridBody.Controls.Add(_flagPanel);
         gridBody.Controls.Add(_lblTableInfo);
 
         _hex = new HexViewerControl { Dock = DockStyle.Fill, Data = _data };
         var hexCard = Theme.CardPanel("มุมมอง Hex (ไบต์ดิบ)", out var hexBody);
+        hexCard.Dock = DockStyle.Fill;
         hexBody.Padding = new Padding(2);
         hexBody.Controls.Add(_hex);
 
@@ -178,12 +181,12 @@ public class EditorForm : Form
         btnSaveAs.Location = new Point(10, 8);
         btnSaveAs.Click += (_, _) => SaveAs();
 
-        var btnUndo = Theme.StyledButton("↶ ย้อนกลับ");
+        var btnUndo = Theme.StyledButton("ย้อนกลับ");
         btnUndo.Name = "btnUndo";
         btnUndo.Location = new Point(150, 8);
         btnUndo.Click += (_, _) => { _history.Undo(_data); UpdateUndoRedoButtons(); RefreshSelectionFromData(); _hex.Invalidate(); };
 
-        var btnRedo = Theme.StyledButton("↷ ทำซ้ำ");
+        var btnRedo = Theme.StyledButton("ทำซ้ำ");
         btnRedo.Name = "btnRedo";
         btnRedo.Location = new Point(250, 8);
         btnRedo.Click += (_, _) => { _history.Redo(_data); UpdateUndoRedoButtons(); RefreshSelectionFromData(); _hex.Invalidate(); };
@@ -226,7 +229,7 @@ public class EditorForm : Form
         var lblVal = new Label { Text = "ค่า:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(352, 60) };
         var txtValue = new TextBox { Name = "txtFunctionValue", Width = 80, Location = new Point(384, 56), Text = "1", Font = Theme.UiFont };
 
-        var btnExecute = Theme.PrimaryButton("ทำงาน ▶");
+        var btnExecute = Theme.PrimaryButton("ทำงาน");
         btnExecute.Location = new Point(478, 55);
         btnExecute.Click += (_, _) => ExecuteFunction();
 

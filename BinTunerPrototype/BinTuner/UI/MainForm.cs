@@ -30,7 +30,7 @@ public class MainForm : Form
         var headerBar = new BorderedPanel { Dock = DockStyle.Top, Height = 56, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
         var lblTitle = new Label
         {
-            Text = "⚡ BinTuner",
+            Text = "BinTuner",
             ForeColor = Theme.Accent,
             Font = new Font(Theme.UiFont.FontFamily, 15f, FontStyle.Bold),
             AutoSize = true,
