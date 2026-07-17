@@ -100,6 +100,76 @@
       "unit": "",
       "decimalPlaces": 0,
       "verified": "byte-exact match: raw 16-bit values at 0x3A93A/0x3A93C read 9750 and 9750, matching the values TunerPro's floating Limitter #3 dashboard widget showed exactly; TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 18292 confirm 1x2, 16-bit, identity equation (X)"
+    },
+    {
+      "name": "Limitter #4",
+      "category": "Limitter",
+      "offset": "0x3B044",
+      "rows": 1,
+      "cols": 2,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X",
+      "unit": "",
+      "decimalPlaces": 0,
+      "verified": "byte-exact match: raw 16-bit values at 0x3B044/0x3B046 read 9650 and 9750, matching the values TunerPro's floating Limitter #4 dashboard widget showed exactly; TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 16352 confirm 1x2, 16-bit, identity equation (X)"
+    },
+    {
+      "name": "Limitter #5",
+      "category": "Limitter",
+      "offset": "0x395DE",
+      "rows": 1,
+      "cols": 2,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X",
+      "unit": "",
+      "decimalPlaces": 0,
+      "verified": "byte-exact match: raw 16-bit values at 0x395DE/0x395E0 read 9650 and 9750, matching the values TunerPro's floating Limitter #5 dashboard widget showed exactly; TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 22833 confirm 1x2, 16-bit, identity equation (X)"
+    },
+    {
+      "name": "TPS vs RPM Secondary - ชดเชย",
+      "category": "Fuel",
+      "offset": "0x3C82A",
+      "rows": 35,
+      "cols": 29,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X/1000",
+      "unit": "",
+      "decimalPlaces": 3,
+      "verified": "TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 5612 confirm address, 35x29, 16-bit, X/1000, No Link; stock-file raw values at this address decode to a smooth ~0.9-1.6 range matching its declared 0-7 display range. This table's 35x29x2=2030-byte span (0x3C82A-0x3D017) is exactly the block that very first stock-vs-tuned byte diff (done before any table address was known) found entirely zeroed out in the tuned .bin files — this table being disabled/zeroed is what that mystery block was"
+    },
+    {
+      "name": "TPS",
+      "category": "Breakpoint",
+      "offset": "0x3B59C",
+      "rows": 29,
+      "cols": 1,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X*0.0976",
+      "unit": "%",
+      "decimalPlaces": 1,
+      "verified": "byte-exact match: all 29 raw values at 0x3B59C decode via X*0.0976 to 0.0, 0.39, 0.59, 0.98, 1.46, 1.95, 3.03, 4.00, 4.98, 5.95, 7.03, 8.00, 9.96, 12.01, 13.96, 16.01, 17.96, 20.01, 24.99, 29.96, 34.94, 40.02, 44.99, 49.97, 54.95, 59.93, 65.00, 70.96, 72.52 — matching the 29 TPS axis values shown in TunerPro's own \"TPS\" table screenshot (0.0 to 72.5) within rounding tolerance. This is the shared TPS breakpoint scale that TPS vs RPM Load/Fast-Idle/Secondary and Ingnition :ไฟ-1 all link their X axis to (their own 'Pure Internal Axis Label Parameters' shown in the Rows/Columns tabs, address 0x3B59C at 1-byte/step -4, is a separate legacy representation TunerPro keeps but doesn't appear to be what's actually used when Label Source is 'Linked, Scale')"
+    },
+    {
+      "name": "RPM",
+      "category": "Breakpoint",
+      "offset": "0x3B5D6",
+      "rows": 35,
+      "cols": 1,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X",
+      "unit": "RPM",
+      "decimalPlaces": 0,
+      "verified": "byte-exact match: all 35 raw values at 0x3B5D6 read 1000,1200,1400,1500,1600,1700,1800,2000,2250,2500,3000,3500,3750,4000,4250,4500,4750,5000,5250,5500,5750,6000,6250,6500,6750,7000,7250,7500,7750,8000,8250,8500,9000,9500,9850 — matching the RPM row headers shown in TunerPro's table screenshots exactly (once a transcription slip of an extra '2750' in the earlier chat notes was corrected against the actual bytes). This is the shared RPM breakpoint scale that TPS vs RPM Load/Fast-Idle/Secondary and Ingnition :ไฟ-1/ไฟ-2 all link their Y axis to; TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 23496 confirm address, 35x1, 16-bit, identity equation, No Link"
     }
   ]
 }
