@@ -20,7 +20,9 @@ public class AfrTuneAdvisorForm : Form
     private readonly Action<Dictionary<(int r, int c), double>> _onApply;
 
     private readonly AfrCell[,] _cells;
+    private readonly double[,] _targetAfr; // per-cell target AFR, editable before/after recording
     private const int MinSamplesForSuggestion = 5;
+    private bool _editingTargets;
 
     private readonly DataSimulator _simulator = new(sampleIntervalMs: 50);
     private readonly HondaEcuReader _ecuReader = new();
@@ -37,6 +39,8 @@ public class AfrTuneAdvisorForm : Form
     private Button _btnStartStop = null!;
     private CheckBox _liveModeCheckbox = null!;
     private NumericUpDown _targetAfrInput = null!;
+    private CheckBox _chkEditTargets = null!;
+    private Button _btnFillTarget = null!;
     private Button _btnApply = null!;
     private Button _btnCalibIdle = null!;
     private Button _btnCalibWot = null!;
@@ -48,9 +52,13 @@ public class AfrTuneAdvisorForm : Form
         _colAxis = colAxis;
         _onApply = onApply;
         _cells = new AfrCell[rowAxis.Length, colAxis.Length];
+        _targetAfr = new double[rowAxis.Length, colAxis.Length];
         for (int r = 0; r < rowAxis.Length; r++)
             for (int c = 0; c < colAxis.Length; c++)
+            {
                 _cells[r, c] = new AfrCell();
+                _targetAfr[r, c] = 14.7;
+            }
 
         Text = $"FKBtuner — แนะนำการจูนจาก AFR — {tableName}";
         Theme.Apply(this);
@@ -82,6 +90,7 @@ public class AfrTuneAdvisorForm : Form
         _grid.RowHeadersDefaultCellStyle.ForeColor = Theme.Accent;
         _grid.RowHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.EnableHeadersVisualStyles = false;
+        _grid.CellEndEdit += Grid_CellEndEdit;
 
         BuildGridStructure();
 
@@ -129,10 +138,10 @@ public class AfrTuneAdvisorForm : Form
         _liveModeCheckbox.CheckedChanged += (_, _) =>
             _btnStartStop.Text = _liveModeCheckbox.Checked ? "เชื่อมต่อ & เริ่มบันทึก (ECU จริง)" : "เริ่มบันทึก (จำลอง)";
 
-        var lblTarget = new Label { Text = "AFR เป้าหมาย:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(440, 15) };
+        var lblTarget = new Label { Text = "ค่าที่จะเติม:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(440, 15) };
         _targetAfrInput = new NumericUpDown
         {
-            Location = new Point(560, 11),
+            Location = new Point(540, 11),
             Width = 80,
             DecimalPlaces = 1,
             Increment = 0.1m,
@@ -140,7 +149,19 @@ public class AfrTuneAdvisorForm : Form
             Maximum = 18.0m,
             Value = 14.7m,
         };
-        _targetAfrInput.ValueChanged += (_, _) => RefreshSuggestions();
+
+        _chkEditTargets = new CheckBox
+        {
+            Text = "ตั้ง AFR เป้าหมายทีละช่อง",
+            AutoSize = true,
+            ForeColor = Theme.Silver,
+            Location = new Point(640, 15),
+        };
+        _chkEditTargets.CheckedChanged += ChkEditTargets_CheckedChanged;
+
+        _btnFillTarget = Theme.StyledButton("เติมเป้าหมายเดียวกันทั้งตาราง");
+        _btnFillTarget.Location = new Point(830, 8);
+        _btnFillTarget.Click += BtnFillTarget_Click;
 
         var btnCalibIdle = Theme.StyledButton("Calibrate: ตอนนี้คือ TPS 0% (ไม่บิดคันเร่ง)");
         btnCalibIdle.Location = new Point(10, 48);
@@ -184,7 +205,7 @@ public class AfrTuneAdvisorForm : Form
 
         bar.Controls.AddRange(new Control[]
         {
-            _btnStartStop, _liveModeCheckbox, lblTarget, _targetAfrInput,
+            _btnStartStop, _liveModeCheckbox, lblTarget, _targetAfrInput, _chkEditTargets, _btnFillTarget,
             btnCalibIdle, btnCalibWot, _btnApply, lblWarn,
         });
         return bar;
@@ -357,10 +378,60 @@ public class AfrTuneAdvisorForm : Form
         return false;
     }
 
+    private void ChkEditTargets_CheckedChanged(object? sender, EventArgs e)
+    {
+        _editingTargets = _chkEditTargets.Checked;
+        _grid.ReadOnly = !_editingTargets;
+        if (_editingTargets) RefreshTargetEditGrid();
+        else RefreshSuggestions();
+    }
+
+    private void BtnFillTarget_Click(object? sender, EventArgs e)
+    {
+        double value = (double)_targetAfrInput.Value;
+        for (int r = 0; r < _rowAxis.Length; r++)
+            for (int c = 0; c < _colAxis.Length; c++)
+                _targetAfr[r, c] = value;
+
+        if (_editingTargets) RefreshTargetEditGrid();
+        else RefreshSuggestions();
+    }
+
+    /// <summary>Shows the per-cell target AFR table for editing (blue tint distinguishes it from the suggestion view).</summary>
+    private void RefreshTargetEditGrid()
+    {
+        for (int r = 0; r < _rowAxis.Length; r++)
+        {
+            for (int c = 0; c < _colAxis.Length; c++)
+            {
+                var gridCell = _grid.Rows[r].Cells[c];
+                gridCell.Value = _targetAfr[r, c].ToString("0.0");
+                gridCell.Style.BackColor = Color.FromArgb(20, 30, 45);
+                gridCell.Style.ForeColor = Theme.Silver;
+            }
+        }
+    }
+
+    private void Grid_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (!_editingTargets) return;
+        var cell = _grid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+
+        if (!double.TryParse(cell.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
+        {
+            cell.Value = _targetAfr[e.RowIndex, e.ColumnIndex].ToString("0.0");
+            return;
+        }
+
+        value = Math.Clamp(value, 9.0, 18.0);
+        _targetAfr[e.RowIndex, e.ColumnIndex] = value;
+        cell.Value = value.ToString("0.0");
+    }
+
     /// <summary>Standard fuel-trim style correction: leaner-than-target -> positive % (add fuel); richer-than-target -> negative % (remove fuel).</summary>
     private void RefreshSuggestions()
     {
-        double target = (double)_targetAfrInput.Value;
+        if (_editingTargets) return;
 
         for (int r = 0; r < _rowAxis.Length; r++)
         {
@@ -377,6 +448,7 @@ public class AfrTuneAdvisorForm : Form
                     continue;
                 }
 
+                double target = _targetAfr[r, c];
                 double pct = (cell.AvgAfr - target) / target * 100.0;
                 gridCell.Value = pct.ToString("+0.0;-0.0;0.0") + "%";
                 gridCell.Style.BackColor = DivergingColor(pct, cell.Confidence);
@@ -403,7 +475,6 @@ public class AfrTuneAdvisorForm : Form
 
     private void BtnApply_Click(object? sender, EventArgs e)
     {
-        double target = (double)_targetAfrInput.Value;
         var suggestions = new Dictionary<(int r, int c), double>();
 
         for (int r = 0; r < _rowAxis.Length; r++)
@@ -411,6 +482,7 @@ public class AfrTuneAdvisorForm : Form
             {
                 var cell = _cells[r, c];
                 if (cell.SampleCount < MinSamplesForSuggestion) continue;
+                double target = _targetAfr[r, c];
                 suggestions[(r, c)] = (cell.AvgAfr - target) / target * 100.0;
             }
 
