@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>BinTuner</RootNamespace>
+    <AssemblyName>FKBtuner</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Presets\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Afr\known_ecus.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="FTD2XX.NET" Version="1.2.1" />
+  </ItemGroup>
+
+</Project>
