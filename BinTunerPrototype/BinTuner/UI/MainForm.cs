@@ -74,6 +74,12 @@ public class MainForm : Form
         _btnOpenEditor.Enabled = false;
         _btnOpenEditor.Click += (_, _) => OpenEditor();
 
+        var btnAfrLogger = Theme.StyledButton("โหมดจับ AFR (Live Log)");
+        btnAfrLogger.Location = new Point(310, 270);
+        btnAfrLogger.Height = 42;
+        btnAfrLogger.Font = new Font(Theme.UiFont.FontFamily, 11f, FontStyle.Bold);
+        btnAfrLogger.Click += (_, _) => new AfrLoggerForm().Show();
+
         var warnCard = Theme.CardPanel("คำเตือนความปลอดภัย", out var warnBody);
         warnCard.Location = new Point(16, 326);
         warnCard.Size = new Size(592, 96);
@@ -90,6 +96,7 @@ public class MainForm : Form
         warnBody.Controls.Add(lblWarn);
 
         Controls.Add(warnCard);
+        Controls.Add(btnAfrLogger);
         Controls.Add(_btnOpenEditor);
         Controls.Add(fileCard);
         Controls.Add(headerBar);

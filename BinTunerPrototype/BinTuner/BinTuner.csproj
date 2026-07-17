@@ -13,10 +13,12 @@
 
   <ItemGroup>
     <None Include="Presets\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Afr\known_ecus.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="FTD2XX.NET" Version="1.2.1" />
   </ItemGroup>
 
 </Project>
