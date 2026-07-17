@@ -224,6 +224,10 @@ public class EditorForm : Form
         };
         chkShowHex.CheckedChanged += (_, _) => _rightSplit.Panel2Collapsed = !chkShowHex.Checked;
 
+        var btn3DGraph = Theme.StyledButton("กราฟ 3D");
+        btn3DGraph.Location = new Point(1120, 8);
+        btn3DGraph.Click += (_, _) => Show3DGraph();
+
         // Row 2 — ปรับค่าตาราง (แบบเดียวกับ TunerPro): ฟังก์ชัน / ค่า / ทำงาน
         var lblFn = new Label { Text = "ฟังก์ชัน:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(10, 60) };
 
@@ -259,7 +263,7 @@ public class EditorForm : Form
 
         bar.Controls.AddRange(new Control[]
         {
-            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare, chkShowHex,
+            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare, chkShowHex, btn3DGraph,
             lblFn, cmbFunction, lblVal, txtValue, btnExecute, lblHint,
         });
         return bar;
@@ -431,6 +435,44 @@ public class EditorForm : Form
         }
 
         _suppressGridEvents = false;
+    }
+
+    /// <summary>Builds the current table's value/axis matrices and opens them in a rotatable 3D graph window.</summary>
+    private void Show3DGraph()
+    {
+        if (_selected == null)
+        {
+            MessageBox.Show(this, "กรุณาเลือกตารางก่อน", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var table = _selected;
+        if (table.Rows < 2 || table.Cols < 2)
+        {
+            MessageBox.Show(this, "ตารางนี้เล็กเกินไปสำหรับกราฟ 3D (ต้องมีอย่างน้อย 2x2 ช่อง)", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var math = new MathEquation(table.MathEquation);
+        var values = new double[table.Rows, table.Cols];
+        for (int r = 0; r < table.Rows; r++)
+        {
+            for (int c = 0; c < table.Cols; c++)
+            {
+                int addr = ElementAddress(table, r, c);
+                long raw = BinFile.ReadElement(_data, addr, table.ElementSizeBits, table.Signed, table.BigEndian);
+                values[r, c] = math.ToPhysical(raw);
+            }
+        }
+
+        var rowAxis = new double[table.Rows];
+        for (int r = 0; r < table.Rows; r++) rowAxis[r] = AxisValue(table.YAxis, r);
+
+        var colAxis = new double[table.Cols];
+        for (int c = 0; c < table.Cols; c++) colAxis[c] = AxisValue(table.XAxis, c);
+
+        var graphForm = new Graph3DForm(table.Name, values, rowAxis, colAxis, "RPM", "TPS", table.Unit);
+        graphForm.Show(this);
     }
 
     /// <summary>RPM breakpoints are always whole numbers on real Honda ECUs — round the display so
