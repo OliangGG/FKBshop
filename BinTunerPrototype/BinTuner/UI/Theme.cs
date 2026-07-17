@@ -125,6 +125,16 @@ public static class Theme
             (int)(a.G + (b.G - a.G) * t),
             (int)(a.B + (b.B - a.B) * t));
     }
+
+    /// <summary>DataGridView doesn't expose DoubleBuffered publicly — flip it on via reflection to
+    /// cut down flicker on grids that get their cell values/colors updated frequently (live logging).</summary>
+    public static void EnableDoubleBuffer(DataGridView grid)
+    {
+        typeof(DataGridView).InvokeMember(
+            "DoubleBuffered",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
+            null, grid, new object[] { true });
+    }
 }
 
 /// <summary>Panel that paints a 1px border in Theme.PanelBorder — gives the ARTTUNER "boxed card" look.</summary>

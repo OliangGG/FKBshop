@@ -329,6 +329,7 @@ public class AfrLoggerForm : Form
         _grid.TopLeftHeaderCell.Style.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.TopLeftHeaderCell.Style.ForeColor = Theme.Accent;
         _grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
+        Theme.EnableDoubleBuffer(_grid);
         _grid.CellPainting += Grid_CellPainting;
 
         var card = Theme.CardPanel("ตารางน้ำมัน (Fuel Map) — RPM x TPS", out var body);

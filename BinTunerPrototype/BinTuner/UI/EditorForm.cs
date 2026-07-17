@@ -116,6 +116,7 @@ public class EditorForm : Form
         _grid.EnableHeadersVisualStyles = false;
         _grid.CellEndEdit += Grid_CellEndEdit;
         _grid.MouseWheel += Grid_MouseWheel;
+        Theme.EnableDoubleBuffer(_grid);
 
         _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 26, BackColor = Theme.HeaderBar, ForeColor = Theme.Silver, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
         _lblAxisInfo = new Label { Dock = DockStyle.Top, Height = 22, BackColor = Theme.HeaderBar, ForeColor = Theme.Accent, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };

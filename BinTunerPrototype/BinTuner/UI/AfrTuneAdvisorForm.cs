@@ -26,7 +26,7 @@ public class AfrTuneAdvisorForm : Form
 
     private readonly DataSimulator _simulator = new(sampleIntervalMs: 50);
     private readonly HondaEcuReader _ecuReader = new();
-    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 16 };
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 60 }; // no smoothed readout here, unlike AfrLoggerForm — doesn't need 60Hz
 
     private readonly object _dataLock = new();
     private double _sharedRpm, _sharedTps, _sharedAfr;
@@ -96,6 +96,7 @@ public class AfrTuneAdvisorForm : Form
         _grid.TopLeftHeaderCell.Style.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.TopLeftHeaderCell.Style.ForeColor = Theme.Accent;
         _grid.CellEndEdit += Grid_CellEndEdit;
+        Theme.EnableDoubleBuffer(_grid);
 
         BuildGridStructure();
 
@@ -373,7 +374,9 @@ public class AfrTuneAdvisorForm : Form
         foreach (var cell in _cells) totalSamples += cell.SampleCount;
         _statusLabel.Text = $"กำลังบันทึก... RPM={rpm:0} TPS={tps:0.0}° AFR(ประมาณ)={afr:0.00}    รวมตัวอย่างสะสม: {totalSamples}";
 
-        RefreshSuggestions();
+        // Only repaint the one cell that changed this tick — looping the whole grid here (60x/sec)
+        // was the cause of the reported flicker/lag while scrolling during a recording session.
+        if (!_editingTargets) ApplyCellSuggestion(r, c);
     }
 
     private static int FindBinIndex(double[] breakpoints, double value)
@@ -450,27 +453,28 @@ public class AfrTuneAdvisorForm : Form
         if (_editingTargets) return;
 
         for (int r = 0; r < _rowAxis.Length; r++)
-        {
             for (int c = 0; c < _colAxis.Length; c++)
-            {
-                var cell = _cells[r, c];
-                var gridCell = _grid.Rows[r].Cells[c];
+                ApplyCellSuggestion(r, c);
+    }
 
-                if (cell.SampleCount < MinSamplesForSuggestion)
-                {
-                    gridCell.Value = cell.SampleCount == 0 ? "" : $"({cell.SampleCount})";
-                    gridCell.Style.BackColor = Theme.Panel;
-                    gridCell.Style.ForeColor = Theme.TextMuted;
-                    continue;
-                }
+    private void ApplyCellSuggestion(int r, int c)
+    {
+        var cell = _cells[r, c];
+        var gridCell = _grid.Rows[r].Cells[c];
 
-                double target = _targetAfr[r, c];
-                double pct = (cell.AvgAfr - target) / target * 100.0;
-                gridCell.Value = pct.ToString("+0.0;-0.0;0.0") + "%";
-                gridCell.Style.BackColor = DivergingColor(pct, cell.Confidence);
-                gridCell.Style.ForeColor = Color.Black;
-            }
+        if (cell.SampleCount < MinSamplesForSuggestion)
+        {
+            gridCell.Value = cell.SampleCount == 0 ? "" : $"({cell.SampleCount})";
+            gridCell.Style.BackColor = Theme.Panel;
+            gridCell.Style.ForeColor = Theme.TextMuted;
+            return;
         }
+
+        double target = _targetAfr[r, c];
+        double pct = (cell.AvgAfr - target) / target * 100.0;
+        gridCell.Value = pct.ToString("+0.0;-0.0;0.0") + "%";
+        gridCell.Style.BackColor = DivergingColor(pct, cell.Confidence);
+        gridCell.Style.ForeColor = Color.Black;
     }
 
     /// <summary>Diverging heat color for a signed correction %: blue = remove fuel, gray = no change, red/orange = add fuel.</summary>
