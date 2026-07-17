@@ -80,8 +80,9 @@ public class MainForm : Form
         warnCard.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         var lblWarn = new Label
         {
-            Text = "โปรแกรมนี้เป็น prototype แยกต่างหาก ยังไม่คำนวณ checksum\n" +
-                   "ไฟล์ที่บันทึกออกจากที่นี่ \"ห้ามนำไป flash\" เข้า ECU จริง จนกว่าจะทำระบบ checksum เสร็จ",
+            Text = "FKBtuner ยังไม่คำนวณ checksum ใหม่ให้ไฟล์ที่แก้ไขเอง\n" +
+                   "ห้าม flash ไฟล์ที่บันทึกจากที่นี่ตรงๆ — ให้เปิดใน ARTTUNER แล้วใช้ \"เขียนไฟล์ (Write ECU)\"\n" +
+                   "ซึ่งมีระบบ auto-checksum ในตัว เพื่อคำนวณ checksum ให้ถูกต้องก่อน flash เข้า ECU จริงเสมอ",
             ForeColor = Theme.Warning,
             AutoSize = true,
             Location = new Point(12, 8),

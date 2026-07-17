@@ -786,7 +786,9 @@ public class EditorForm : Form
 
             string msg = roundTripOk
                 ? $"บันทึกไฟล์สำเร็จ: {dlg.FileName}\nแก้ไขทั้งหมด {diffs.Count} byte(s) เทียบกับไฟล์ต้นฉบับ\n\n" +
-                  "คำเตือน: ไฟล์นี้ยังไม่มีการคำนวณ checksum ใหม่\n\"ห้ามนำไป flash เข้า ECU\" จนกว่าจะทำ Phase 3 (checksum) เสร็จ"
+                  "คำเตือน: FKBtuner ยังไม่ได้คำนวณ checksum ใหม่ให้ไฟล์นี้เอง\n" +
+                  "ห้าม flash ไฟล์นี้ตรงๆ เด็ดขาด — ให้เปิดไฟล์นี้ใน ARTTUNER แล้วใช้ปุ่ม \"เขียนไฟล์ (Write ECU)\" " +
+                  "ซึ่งมีระบบ auto-checksum ในตัว เพื่อคำนวณ checksum ให้ถูกต้องก่อน flash เข้า ECU จริงทุกครั้ง"
                 : "คำเตือน: อ่านไฟล์ที่บันทึกกลับมาแล้วไม่ตรงกับข้อมูลในโปรแกรม — กรุณาตรวจสอบไฟล์ก่อนใช้งาน";
 
             MessageBox.Show(this, msg, "บันทึกไฟล์", MessageBoxButtons.OK,
