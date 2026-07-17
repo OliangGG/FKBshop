@@ -93,6 +93,9 @@ public class EditorForm : Form
             SelectionMode = DataGridViewSelectionMode.CellSelect,
             EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2,
             Font = Theme.UiFont,
+            ShowCellErrors = false, // avoids a known WinForms crash ("Cell is not in a DataGridView")
+            ShowRowErrors = false,  // when the mouse hovers a cell right as Columns/Rows get rebuilt
+            ShowEditingIcon = false,
         };
         _grid.DefaultCellStyle.BackColor = Theme.Background;
         _grid.DefaultCellStyle.ForeColor = Color.Black;
@@ -228,6 +231,10 @@ public class EditorForm : Form
         btn3DGraph.Location = new Point(1120, 8);
         btn3DGraph.Click += (_, _) => Show3DGraph();
 
+        var btnAfrAdvisor = Theme.StyledButton("แนะนำการจูนจาก AFR...");
+        btnAfrAdvisor.Location = new Point(1230, 8);
+        btnAfrAdvisor.Click += (_, _) => ShowAfrTuneAdvisor();
+
         // Row 2 — ปรับค่าตาราง (แบบเดียวกับ TunerPro): ฟังก์ชัน / ค่า / ทำงาน
         var lblFn = new Label { Text = "ฟังก์ชัน:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(10, 60) };
 
@@ -263,7 +270,7 @@ public class EditorForm : Form
 
         bar.Controls.AddRange(new Control[]
         {
-            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare, chkShowHex, btn3DGraph,
+            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare, chkShowHex, btn3DGraph, btnAfrAdvisor,
             lblFn, cmbFunction, lblVal, txtValue, btnExecute, lblHint,
         });
         return bar;
@@ -473,6 +480,52 @@ public class EditorForm : Form
 
         var graphForm = new Graph3DForm(table.Name, values, rowAxis, colAxis, "RPM", "TPS", table.Unit);
         graphForm.Show(this);
+    }
+
+    /// <summary>Opens the AFR-based tuning advisor, binned directly onto the current table's real RPM/TPS axes.</summary>
+    private void ShowAfrTuneAdvisor()
+    {
+        if (_selected == null)
+        {
+            MessageBox.Show(this, "กรุณาเลือกตารางก่อน", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var table = _selected;
+        if (table.Rows < 1 || table.Cols < 1) return;
+
+        var rowAxis = new double[table.Rows];
+        for (int r = 0; r < table.Rows; r++) rowAxis[r] = AxisValue(table.YAxis, r);
+
+        var colAxis = new double[table.Cols];
+        for (int c = 0; c < table.Cols; c++) colAxis[c] = AxisValue(table.XAxis, c);
+
+        var advisor = new AfrTuneAdvisorForm(table.Name, rowAxis, colAxis, ApplyAfrSuggestions);
+        advisor.Show(this);
+    }
+
+    /// <summary>Applies AfrTuneAdvisorForm's suggested per-cell % correction into the current table as one undo step.</summary>
+    private void ApplyAfrSuggestions(Dictionary<(int r, int c), double> suggestedPercentByCell)
+    {
+        if (_selected == null) return;
+        var table = _selected;
+        var math = new MathEquation(table.MathEquation);
+        var command = new EditCommand { Description = "ใช้คำแนะนำการจูนจาก AFR" };
+        bool anyClamped = false;
+
+        foreach (var (key, pct) in suggestedPercentByCell)
+        {
+            var (r, c) = key;
+            if (r < 0 || r >= table.Rows || c < 0 || c >= table.Cols) continue;
+
+            int addr = ElementAddress(table, r, c);
+            long oldRaw = BinFile.ReadElement(_data, addr, table.ElementSizeBits, table.Signed, table.BigEndian);
+            double physical = math.ToPhysical(oldRaw);
+            double newPhysical = physical * (1 + pct / 100.0);
+            WriteTableCell(table, math, addr, newPhysical, command, ref anyClamped);
+        }
+
+        FinishEdit(command, anyClamped);
     }
 
     /// <summary>RPM breakpoints are always whole numbers on real Honda ECUs — round the display so

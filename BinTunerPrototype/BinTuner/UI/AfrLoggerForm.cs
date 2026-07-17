@@ -78,6 +78,9 @@ public class AfrLoggerForm : Form
             SelectionMode = DataGridViewSelectionMode.CellSelect,
             DefaultCellStyle = { Font = new Font("Consolas", 7.5f) },
             RowTemplate = { Height = 18 },
+            ShowCellErrors = false, // avoids a known WinForms crash ("Cell is not in a DataGridView")
+            ShowRowErrors = false,  // when the mouse hovers a cell right as Columns/Rows get rebuilt
+            ShowEditingIcon = false,
         };
         _grid.ColumnHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
         _grid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Accent;
