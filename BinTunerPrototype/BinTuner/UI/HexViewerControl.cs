@@ -88,7 +88,7 @@ public class HexViewerControl : Control
         if (_data == null || _data.Length == 0)
         {
             using var emptyBrush = new SolidBrush(Theme.TextMuted);
-            g.DrawString("(no file loaded)", Font, emptyBrush, 8, 8);
+            g.DrawString("(ยังไม่ได้โหลดไฟล์)", Font, emptyBrush, 8, 8);
             return;
         }
 

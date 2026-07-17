@@ -32,7 +32,7 @@ public class NumericPromptDialog : Form
             }
             else
             {
-                MessageBox.Show(this, "กรุณาป้อนตัวเลข", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "กรุณาป้อนตัวเลข", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         };
 

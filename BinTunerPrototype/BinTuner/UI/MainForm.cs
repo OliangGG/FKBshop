@@ -18,88 +18,117 @@ public class MainForm : Form
 
     public MainForm()
     {
-        Text = "BinTuner (prototype) — Honda ECU .bin/.xdf editor";
+        Text = "BinTuner — เครื่องมือแก้ไฟล์ ECU มอเตอร์ไซค์ฮอนด้า (.bin/.xdf)";
         Theme.Apply(this);
-        Width = 560;
-        Height = 340;
+        BackColor = Theme.Background;
+        Width = 640;
+        Height = 500;
         StartPosition = FormStartPosition.CenterScreen;
+        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
 
+        var headerBar = new BorderedPanel { Dock = DockStyle.Top, Height = 56, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
         var lblTitle = new Label
         {
-            Text = "BinTuner — เปิด .bin + .xdf แล้วแก้ตารางแบบ TunerPro",
+            Text = "⚡ BinTuner",
             ForeColor = Theme.Accent,
-            Font = new Font(Theme.UiFont, FontStyle.Bold),
+            Font = new Font(Theme.UiFont.FontFamily, 15f, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(16, 16),
+            Location = new Point(16, 12),
         };
+        var lblSubtitle = new Label
+        {
+            Text = "เปิด .bin + .xdf แล้วจูนตารางแบบ TunerPro",
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            Location = new Point(150, 20),
+        };
+        headerBar.Controls.AddRange(new Control[] { lblTitle, lblSubtitle });
 
-        var btnOpenBin = Theme.StyledButton("เปิดไฟล์ BIN...");
-        btnOpenBin.Location = new Point(16, 56);
+        var fileCard = Theme.CardPanel("การดำเนินการ", out var fileBody);
+        fileCard.Location = new Point(16, 68);
+        fileCard.Size = new Size(592, 190);
+        fileCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+        var btnOpenBin = Theme.PrimaryButton("เลือกไฟล์ BIN...");
+        btnOpenBin.Location = new Point(16, 16);
         btnOpenBin.Click += (_, _) => OpenBin();
 
-        var btnOpenXdf = Theme.StyledButton("เปิดไฟล์ XDF...");
-        btnOpenXdf.Location = new Point(16, 96);
+        var btnOpenXdf = Theme.StyledButton("เลือกไฟล์ XDF...");
+        btnOpenXdf.Location = new Point(16, 62);
         btnOpenXdf.Click += (_, _) => OpenXdf();
 
         var btnLoadPreset = Theme.StyledButton("โหลด Preset ที่ยืนยันแล้ว...");
-        btnLoadPreset.Location = new Point(16, 136);
+        btnLoadPreset.Location = new Point(16, 108);
         btnLoadPreset.Click += (_, _) => LoadPreset();
 
-        _lblBin = new Label { Text = "BIN: (ยังไม่ได้เปิด)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(220, 62) };
-        _lblXdf = new Label { Text = "XDF/Preset: (ยังไม่ได้เปิด)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(220, 102) };
+        _lblBin = new Label { Text = "ไฟล์ BIN: (ยังไม่ได้เลือก)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(230, 24) };
+        _lblXdf = new Label { Text = "ไฟล์ XDF / Preset: (ยังไม่ได้เลือก)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(230, 70) };
 
-        _btnOpenEditor = Theme.StyledButton("เปิดตัวแก้ตาราง (Editor)");
-        _btnOpenEditor.Location = new Point(16, 190);
+        fileBody.Controls.AddRange(new Control[] { btnOpenBin, btnOpenXdf, btnLoadPreset, _lblBin, _lblXdf });
+
+        _btnOpenEditor = Theme.PrimaryButton("เปิดตัวแก้ตาราง / จูน");
+        _btnOpenEditor.Location = new Point(16, 270);
+        _btnOpenEditor.Height = 42;
+        _btnOpenEditor.Font = new Font(Theme.UiFont.FontFamily, 11f, FontStyle.Bold);
         _btnOpenEditor.Enabled = false;
         _btnOpenEditor.Click += (_, _) => OpenEditor();
 
+        var warnCard = Theme.CardPanel("คำเตือนความปลอดภัย", out var warnBody);
+        warnCard.Location = new Point(16, 326);
+        warnCard.Size = new Size(592, 96);
+        warnCard.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         var lblWarn = new Label
         {
-            Text = "หมายเหตุ: โปรแกรมนี้เป็น prototype แยกต่างหาก ยังไม่คำนวณ checksum\n" +
-                   "ไฟล์ที่ Save As ออกมาจากที่นี่ \"ห้าม flash\" เข้า ECU จริง",
-            ForeColor = Color.FromArgb(210, 170, 60),
+            Text = "โปรแกรมนี้เป็น prototype แยกต่างหาก ยังไม่คำนวณ checksum\n" +
+                   "ไฟล์ที่บันทึกออกจากที่นี่ \"ห้ามนำไป flash\" เข้า ECU จริง จนกว่าจะทำระบบ checksum เสร็จ",
+            ForeColor = Theme.Warning,
             AutoSize = true,
-            Location = new Point(16, 240),
+            Location = new Point(12, 8),
         };
+        warnBody.Controls.Add(lblWarn);
 
-        Controls.AddRange(new Control[] { lblTitle, btnOpenBin, btnOpenXdf, btnLoadPreset, _lblBin, _lblXdf, _btnOpenEditor, lblWarn });
+        Controls.Add(warnCard);
+        Controls.Add(_btnOpenEditor);
+        Controls.Add(fileCard);
+        Controls.Add(headerBar);
     }
 
     private void OpenBin()
     {
-        using var dlg = new OpenFileDialog { Filter = "ECU BIN files (*.bin)|*.bin|All files (*.*)|*.*" };
+        using var dlg = new OpenFileDialog { Filter = "ไฟล์ ECU BIN (*.bin)|*.bin|ไฟล์ทั้งหมด (*.*)|*.*" };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
         try
         {
             _binData = BinFile.Load(dlg.FileName);
             _binPath = dlg.FileName;
-            _lblBin.Text = $"BIN: {Path.GetFileName(_binPath)} ({_binData.Length:N0} bytes)";
+            _lblBin.Text = $"ไฟล์ BIN: {Path.GetFileName(_binPath)} ({_binData.Length:N0} bytes)";
             _lblBin.ForeColor = Theme.Silver;
             UpdateEditorButton();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"เปิดไฟล์ BIN ไม่สำเร็จ:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, $"เปิดไฟล์ BIN ไม่สำเร็จ:\n{ex.Message}", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
     private void OpenXdf()
     {
-        using var dlg = new OpenFileDialog { Filter = "XDF definition files (*.xdf)|*.xdf|All files (*.*)|*.*" };
+        using var dlg = new OpenFileDialog { Filter = "ไฟล์กำหนดตาราง XDF (*.xdf)|*.xdf|ไฟล์ทั้งหมด (*.*)|*.*" };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
         try
         {
             _xdf = XdfParser.Parse(dlg.FileName);
             _xdfPath = dlg.FileName;
-            _lblXdf.Text = $"XDF: {Path.GetFileName(_xdfPath)} ({_xdf.Tables.Count} parameters)";
+            _lblXdf.Text = $"ไฟล์ XDF: {Path.GetFileName(_xdfPath)} ({_xdf.Tables.Count} พารามิเตอร์)";
             _lblXdf.ForeColor = Theme.Silver;
             UpdateEditorButton();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"อ่านไฟล์ XDF ไม่สำเร็จ:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, $"อ่านไฟล์ XDF ไม่สำเร็จ:\n{ex.Message}", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -108,7 +137,7 @@ public class MainForm : Form
         string presetsDir = Path.Combine(AppContext.BaseDirectory, "Presets");
         using var dlg = new OpenFileDialog
         {
-            Filter = "BinTuner preset (*.json)|*.json|All files (*.*)|*.*",
+            Filter = "BinTuner preset (*.json)|*.json|ไฟล์ทั้งหมด (*.*)|*.*",
             InitialDirectory = Directory.Exists(presetsDir) ? presetsDir : AppContext.BaseDirectory,
         };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
@@ -120,13 +149,13 @@ public class MainForm : Form
             _xdf.EcuId = preset.EcuId;
             _xdf.PartNumber = preset.PartNumber;
             _xdf.Tables.AddRange(preset.Tables);
-            _lblXdf.Text = $"XDF/Preset: {Path.GetFileName(dlg.FileName)} ({_xdf.Tables.Count} parameters รวม)";
+            _lblXdf.Text = $"XDF/Preset: {Path.GetFileName(dlg.FileName)} ({_xdf.Tables.Count} พารามิเตอร์รวม)";
             _lblXdf.ForeColor = Theme.Silver;
             UpdateEditorButton();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"โหลด preset ไม่สำเร็จ:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, $"โหลด preset ไม่สำเร็จ:\n{ex.Message}", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

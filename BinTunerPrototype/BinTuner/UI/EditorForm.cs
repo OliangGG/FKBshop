@@ -22,11 +22,27 @@ public class EditorForm : Form
     private readonly Panel _flagPanel;
     private readonly CheckBox _chkFlag;
     private readonly Label _lblFlagInfo;
+    private readonly ComboBox _cmbFunction;
+    private readonly TextBox _txtFunctionValue;
+    private readonly Label _lblCompare;
 
     private TableDef? _selected;
     private FlagDef? _selectedFlag;
     private bool _suppressGridEvents;
     private bool _suppressFlagEvents;
+    private byte[]? _compareData;
+    private string? _compareLabel;
+
+    private const string FnOffset = "บวก/ลบค่า (Offset)";
+    private const string FnMultiply = "คูณค่า (Multiply)";
+    private const string FnDivide = "หารค่า (Divide)";
+    private const string FnScaleByPercent = "ปรับเป็น % (Scale)";
+    private const string FnFillWithValue = "เติมค่าเดียวกันทั้งหมด (Fill)";
+    private const string FnSmooth = "ปรับให้เรียบ (Smooth)";
+    private const string FnInterpolateX = "เชื่อมค่าแนวนอน (Interpolate X)";
+    private const string FnInterpolateY = "เชื่อมค่าแนวตั้ง (Interpolate Y)";
+    private const string FnInterpolateXY = "เชื่อมค่าแนวตั้ง+นอน (Interpolate XY)";
+    private const string FnCopyFromCompare = "คัดลอกจากไฟล์เปรียบเทียบ";
 
     public EditorForm(byte[] binData, string binPath, ParsedXdf xdf)
     {
@@ -35,8 +51,9 @@ public class EditorForm : Form
         _binPath = binPath;
         _xdf = xdf;
 
-        Text = $"BinTuner Editor — {Path.GetFileName(binPath)}";
+        Text = $"BinTuner — แก้ตาราง ECU — {Path.GetFileName(binPath)}";
         Theme.Apply(this);
+        BackColor = Theme.Background;
         WindowState = FormWindowState.Maximized;
 
         var toolbar = BuildToolbar();
@@ -48,6 +65,7 @@ public class EditorForm : Form
             ForeColor = Theme.Silver,
             BorderStyle = BorderStyle.None,
             HideSelection = false,
+            Font = Theme.UiFont,
         };
         _tree.AfterSelect += (_, e) =>
         {
@@ -55,35 +73,38 @@ public class EditorForm : Form
             else SelectTable(e.Node?.Tag as TableDef);
         };
 
-        var treePanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = new Padding(4) };
-        var treeHeader = new Label { Text = "Parameter Tree", Dock = DockStyle.Top, ForeColor = Theme.Accent, Font = new Font(Theme.UiFont, FontStyle.Bold), Height = 24, TextAlign = ContentAlignment.MiddleLeft };
-        treePanel.Controls.Add(_tree);
-        treePanel.Controls.Add(treeHeader);
+        var treeCard = Theme.CardPanel("รายการพารามิเตอร์ (Parameter Tree)", out var treeBody);
+        treeBody.Padding = new Padding(2);
+        treeBody.Controls.Add(_tree);
 
         _grid = new DataGridView
         {
             Dock = DockStyle.Fill,
-            BackgroundColor = Theme.Background,
+            BackgroundColor = Theme.Panel,
             GridColor = Theme.GridLine,
+            BorderStyle = BorderStyle.None,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.AutoSizeToAllHeaders,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             SelectionMode = DataGridViewSelectionMode.CellSelect,
             EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2,
+            Font = Theme.UiFont,
         };
         _grid.DefaultCellStyle.BackColor = Theme.Background;
         _grid.DefaultCellStyle.ForeColor = Color.Black;
         _grid.DefaultCellStyle.SelectionBackColor = Theme.Accent;
         _grid.DefaultCellStyle.SelectionForeColor = Color.White;
-        _grid.ColumnHeadersDefaultCellStyle.BackColor = Theme.Panel;
-        _grid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Silver;
-        _grid.RowHeadersDefaultCellStyle.BackColor = Theme.Panel;
-        _grid.RowHeadersDefaultCellStyle.ForeColor = Theme.Silver;
+        _grid.ColumnHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
+        _grid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Accent;
+        _grid.ColumnHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
+        _grid.RowHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
+        _grid.RowHeadersDefaultCellStyle.ForeColor = Theme.Accent;
+        _grid.RowHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.EnableHeadersVisualStyles = false;
         _grid.CellEndEdit += Grid_CellEndEdit;
 
-        _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 26, ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(6, 0, 0, 0) };
+        _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 28, BackColor = Theme.HeaderBar, ForeColor = Theme.Silver, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
 
         _chkFlag = new CheckBox
         {
@@ -92,6 +113,7 @@ public class EditorForm : Form
             Location = new Point(24, 24),
             Font = new Font(Theme.UiFont.FontFamily, 14f),
             ForeColor = Theme.Silver,
+            BackColor = Color.Transparent,
         };
         _chkFlag.CheckedChanged += ChkFlag_CheckedChanged;
 
@@ -100,35 +122,48 @@ public class EditorForm : Form
         var lblFlagWarning = new Label
         {
             Text = "คำเตือน: บาง flag เกี่ยวข้องกับความปลอดภัย/ระบบล็อกของรถ (เช่น เซนเซอร์นิรภัยขาตั้งข้าง, ระบบล็อกสตาร์ท)\n" +
-                   "เปลี่ยนแล้วอาจกระทบพฤติกรรมของรถโดยตรง โปรดตรวจสอบให้แน่ใจก่อน Save As และ flash จริง",
+                   "เปลี่ยนแล้วอาจกระทบพฤติกรรมของรถโดยตรง โปรดตรวจสอบให้แน่ใจก่อนบันทึกและนำไป flash จริง",
             AutoSize = true,
             Location = new Point(24, 100),
-            ForeColor = Color.FromArgb(210, 170, 60),
+            ForeColor = Theme.Warning,
         };
 
-        _flagPanel = new Panel { Dock = DockStyle.Fill, Visible = false };
+        _flagPanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Visible = false };
         _flagPanel.Controls.AddRange(new Control[] { _chkFlag, _lblFlagInfo, lblFlagWarning });
 
-        var gridPanel = new Panel { Dock = DockStyle.Fill };
-        gridPanel.Controls.Add(_grid);
-        gridPanel.Controls.Add(_flagPanel);
-        gridPanel.Controls.Add(_lblTableInfo);
+        var gridCard = Theme.CardPanel("ตารางค่า / จูน", out var gridBody);
+        gridBody.Controls.Add(_grid);
+        gridBody.Controls.Add(_flagPanel);
+        gridBody.Controls.Add(_lblTableInfo);
 
         _hex = new HexViewerControl { Dock = DockStyle.Fill, Data = _data };
+        var hexCard = Theme.CardPanel("มุมมอง Hex (ไบต์ดิบ)", out var hexBody);
+        hexBody.Padding = new Padding(2);
+        hexBody.Controls.Add(_hex);
 
-        var rightSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 420 };
-        rightSplit.Panel1.Controls.Add(gridPanel);
-        rightSplit.Panel2.Controls.Add(_hex);
+        var rightSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 460, BackColor = Theme.Background, SplitterWidth = 6 };
+        rightSplit.Panel1.BackColor = Theme.Background;
+        rightSplit.Panel2.BackColor = Theme.Background;
+        rightSplit.Panel1.Controls.Add(gridCard);
+        rightSplit.Panel2.Controls.Add(hexCard);
 
-        var mainSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 240 };
-        mainSplit.Panel1.Controls.Add(treePanel);
+        var mainSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 260, BackColor = Theme.Background, SplitterWidth = 6 };
+        mainSplit.Panel1.BackColor = Theme.Background;
+        mainSplit.Panel2.BackColor = Theme.Background;
+        mainSplit.Panel1.Controls.Add(treeCard);
         mainSplit.Panel2.Controls.Add(rightSplit);
 
-        Controls.Add(mainSplit);
+        var contentWrap = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background, Padding = new Padding(8, 6, 8, 8) };
+        contentWrap.Controls.Add(mainSplit);
+
+        Controls.Add(contentWrap);
         Controls.Add(toolbar);
 
         _btnUndo = (Button)toolbar.Controls["btnUndo"]!;
         _btnRedo = (Button)toolbar.Controls["btnRedo"]!;
+        _cmbFunction = (ComboBox)toolbar.Controls["cmbFunction"]!;
+        _txtFunctionValue = (TextBox)toolbar.Controls["txtFunctionValue"]!;
+        _lblCompare = (Label)toolbar.Controls["lblCompare"]!;
         UpdateUndoRedoButtons();
 
         RebuildTree();
@@ -136,49 +171,87 @@ public class EditorForm : Form
 
     private Panel BuildToolbar()
     {
-        var bar = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Theme.Panel };
+        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 94, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
 
-        var btnSaveAs = Theme.StyledButton("Save As...");
+        var btnSaveAs = Theme.PrimaryButton("บันทึกเป็น...");
         btnSaveAs.Name = "btnSaveAs";
-        btnSaveAs.Location = new Point(8, 7);
+        btnSaveAs.Location = new Point(10, 8);
         btnSaveAs.Click += (_, _) => SaveAs();
 
-        var btnUndo = Theme.StyledButton("Undo");
+        var btnUndo = Theme.StyledButton("↶ ย้อนกลับ");
         btnUndo.Name = "btnUndo";
-        btnUndo.Location = new Point(140, 7);
+        btnUndo.Location = new Point(150, 8);
         btnUndo.Click += (_, _) => { _history.Undo(_data); UpdateUndoRedoButtons(); RefreshSelectionFromData(); _hex.Invalidate(); };
 
-        var btnRedo = Theme.StyledButton("Redo");
+        var btnRedo = Theme.StyledButton("↷ ทำซ้ำ");
         btnRedo.Name = "btnRedo";
-        btnRedo.Location = new Point(220, 7);
+        btnRedo.Location = new Point(250, 8);
         btnRedo.Click += (_, _) => { _history.Redo(_data); UpdateUndoRedoButtons(); RefreshSelectionFromData(); _hex.Invalidate(); };
 
-        var btnOffset = Theme.StyledButton("Offset +/-");
-        btnOffset.Location = new Point(310, 7);
-        btnOffset.Click += (_, _) => ApplyBatchOp("Offset", (phys, k) => phys + k);
-
-        var btnScale = Theme.StyledButton("Scale x/");
-        btnScale.Location = new Point(410, 7);
-        btnScale.Click += (_, _) => ApplyBatchOp("Scale (คูณ)", (phys, k) => phys * k);
-
-        var btnPercent = Theme.StyledButton("Percentage %");
-        btnPercent.Location = new Point(510, 7);
-        btnPercent.Click += (_, _) => ApplyBatchOp("Percentage (เช่น 5 = +5%, -10 = -10%)", (phys, k) => phys * (1 + k / 100.0));
-
         var btnManual = Theme.StyledButton("เพิ่มตารางเอง...");
-        btnManual.Location = new Point(650, 7);
+        btnManual.Location = new Point(340, 8);
         btnManual.Click += (_, _) => AddManualTable();
 
-        bar.Controls.AddRange(new Control[] { btnSaveAs, btnUndo, btnRedo, btnOffset, btnScale, btnPercent, btnManual });
+        var btnLoadCompare = Theme.StyledButton("โหลดไฟล์เปรียบเทียบ...");
+        btnLoadCompare.Location = new Point(490, 8);
+        btnLoadCompare.Click += (_, _) => LoadCompareFile();
+
+        var lblCompare = new Label
+        {
+            Name = "lblCompare",
+            Text = "ไฟล์เปรียบเทียบ: (ยังไม่โหลด)",
+            AutoSize = true,
+            ForeColor = Theme.TextMuted,
+            Location = new Point(665, 16),
+        };
+
+        // Row 2 — ปรับค่าตาราง (แบบเดียวกับ TunerPro): ฟังก์ชัน / ค่า / ทำงาน
+        var lblFn = new Label { Text = "ฟังก์ชัน:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(10, 60) };
+
+        var cmbFunction = new ComboBox
+        {
+            Name = "cmbFunction",
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 260,
+            Location = new Point(80, 56),
+            Font = Theme.UiFont,
+        };
+        cmbFunction.Items.AddRange(new object[]
+        {
+            FnOffset, FnMultiply, FnDivide, FnScaleByPercent, FnFillWithValue,
+            FnSmooth, FnInterpolateX, FnInterpolateY, FnInterpolateXY, FnCopyFromCompare,
+        });
+        cmbFunction.SelectedIndex = 0;
+
+        var lblVal = new Label { Text = "ค่า:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(352, 60) };
+        var txtValue = new TextBox { Name = "txtFunctionValue", Width = 80, Location = new Point(384, 56), Text = "1", Font = Theme.UiFont };
+
+        var btnExecute = Theme.PrimaryButton("ทำงาน ▶");
+        btnExecute.Location = new Point(478, 55);
+        btnExecute.Click += (_, _) => ExecuteFunction();
+
+        var lblHint = new Label
+        {
+            Text = "เลือกช่องในตารางก่อน แล้วเลือกฟังก์ชัน ใส่ค่า แล้วกด \"ทำงาน\"",
+            AutoSize = true,
+            ForeColor = Theme.TextMuted,
+            Location = new Point(600, 60),
+        };
+
+        bar.Controls.AddRange(new Control[]
+        {
+            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare,
+            lblFn, cmbFunction, lblVal, txtValue, btnExecute, lblHint,
+        });
         return bar;
     }
 
     private void RebuildTree()
     {
         _tree.Nodes.Clear();
-        var scalarsRoot = new TreeNode("Scalars");
-        var flagsRoot = new TreeNode("Flags");
-        var tablesRoot = new TreeNode("Tables");
+        var scalarsRoot = new TreeNode("ค่าคงที่ (Scalars)");
+        var flagsRoot = new TreeNode("สวิตช์เปิด/ปิด (Flags)");
+        var tablesRoot = new TreeNode("ตาราง (Tables)");
 
         foreach (var group in _xdf.Tables.GroupBy(t => t.Category))
         {
@@ -217,7 +290,7 @@ public class EditorForm : Form
 
         if (dlg.Result.Offset < 0 || dlg.Result.Offset + dlg.Result.TotalByteLength > _data.Length)
         {
-            MessageBox.Show(this, "Offset + ขนาดตาราง เกินขอบเขตไฟล์ .bin", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Offset + ขนาดตาราง เกินขอบเขตไฟล์ .bin", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -242,7 +315,7 @@ public class EditorForm : Form
             return;
         }
 
-        _lblTableInfo.Text = $"{table.Name}   offset=0x{table.Offset:X}   {table.Rows}x{table.Cols}   {table.ElementSizeBits}-bit {(table.Signed ? "signed" : "unsigned")}   unit={table.Unit}   eq: raw -> {table.MathEquation}";
+        _lblTableInfo.Text = $"{table.Name}    ตำแหน่ง=0x{table.Offset:X}    ขนาด {table.Rows}x{table.Cols}    {table.ElementSizeBits}-bit {(table.Signed ? "มีเครื่องหมาย" : "ไม่มีเครื่องหมาย")}    หน่วย={table.Unit}    สมการ: ค่าดิบ -> {table.MathEquation}";
         _hex.SetHighlight(table.Offset, table.TotalByteLength);
         _hex.ScrollToOffset(table.Offset);
         RefreshGridFromData();
@@ -270,7 +343,7 @@ public class EditorForm : Form
         _suppressFlagEvents = true;
         _chkFlag.Text = flag.Name;
         _chkFlag.Checked = BinFile.ReadFlag(_data, flag.Offset, flag.Mask);
-        _lblFlagInfo.Text = $"offset=0x{flag.Offset:X}   mask=0x{flag.Mask:X2}   category={flag.Category}";
+        _lblFlagInfo.Text = $"ตำแหน่ง=0x{flag.Offset:X}    mask=0x{flag.Mask:X2}    หมวด={flag.Category}";
         _suppressFlagEvents = false;
     }
 
@@ -339,11 +412,15 @@ public class EditorForm : Form
         _suppressGridEvents = false;
     }
 
-    private string AxisHeader(AxisDef? axis, int index)
+    private string AxisHeader(AxisDef? axis, int index) => AxisValue(axis, index).ToString("0.##");
+
+    /// <summary>Real-world axis value (RPM/TPS/etc.) at a row/column index — used for headers and for
+    /// weighting the Interpolate X/Y/XY functions by actual breakpoint position, not raw index.</summary>
+    private double AxisValue(AxisDef? axis, int index)
     {
-        if (axis == null) return index.ToString();
+        if (axis == null) return index;
         if (axis.StaticValues != null && index < axis.StaticValues.Length)
-            return axis.StaticValues[index].ToString("0.##");
+            return axis.StaticValues[index];
         if (axis.EmbeddedAddress is int addr)
         {
             int bytesPer = axis.ElementSizeBits / 8;
@@ -351,11 +428,10 @@ public class EditorForm : Form
             if (elemAddr + bytesPer <= _data.Length)
             {
                 long raw = BinFile.ReadElement(_data, elemAddr, axis.ElementSizeBits, axis.Signed, axis.BigEndian);
-                double physical = new MathEquation(axis.MathEquation).ToPhysical(raw);
-                return physical.ToString("0.##");
+                return new MathEquation(axis.MathEquation).ToPhysical(raw);
             }
         }
-        return index.ToString();
+        return index;
     }
 
     private static int ElementAddress(TableDef table, int row, int col) =>
@@ -369,7 +445,7 @@ public class EditorForm : Form
 
         if (!double.TryParse(cell.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double physical))
         {
-            MessageBox.Show(this, "ค่าที่ป้อนไม่ใช่ตัวเลข", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "ค่าที่ป้อนไม่ใช่ตัวเลข", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             RefreshGridFromData();
             return;
         }
@@ -381,28 +457,20 @@ public class EditorForm : Form
         if (rawD > table.RawMax) { rawD = table.RawMax; clamped = true; }
 
         int addr = ElementAddress(table, e.RowIndex, e.ColumnIndex);
-        ApplyRawWrite(table, addr, (long)rawD, "Edit cell");
+        ApplyRawWrite(table, addr, (long)rawD, "แก้ไขช่อง");
 
         if (clamped)
-            MessageBox.Show(this, $"ค่าเกินขอบเขตของชนิดข้อมูล ({table.RawMin}..{table.RawMax}) — ปรับให้เป็นค่าขอบสุดแล้ว", "Clamped", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, $"ค่าเกินขอบเขตของชนิดข้อมูล ({table.RawMin}..{table.RawMax}) — ปรับให้เป็นค่าขอบสุดแล้ว", "ค่าเกินขอบเขต", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         RefreshGridFromData();
         _hex.Invalidate();
         UpdateUndoRedoButtons();
     }
 
-    private void ApplyBatchOp(string title, Func<double, double, double> op)
+    /// <summary>Applies op(currentPhysical, value) to every selected cell in the current table.</summary>
+    private void ApplyBatchOp(string title, double value, Func<double, double, double> op)
     {
-        if (_selected == null || _grid.SelectedCells.Count == 0)
-        {
-            MessageBox.Show(this, "กรุณาเลือกช่องในตารางก่อน", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        using var dlg = new NumericPromptDialog(title, "ป้อนค่า:");
-        if (dlg.ShowDialog(this) != DialogResult.OK) return;
-
-        var table = _selected;
+        var table = _selected!;
         var math = new MathEquation(table.MathEquation);
         var command = new EditCommand { Description = title };
         bool anyClamped = false;
@@ -413,25 +481,11 @@ public class EditorForm : Form
             int addr = ElementAddress(table, cell.RowIndex, cell.ColumnIndex);
             long oldRaw = BinFile.ReadElement(_data, addr, table.ElementSizeBits, table.Signed, table.BigEndian);
             double physical = math.ToPhysical(oldRaw);
-            double newPhysical = op(physical, dlg.Value);
-            double newRawD = Math.Round(math.ToRaw(newPhysical));
-            if (newRawD < table.RawMin) { newRawD = table.RawMin; anyClamped = true; }
-            if (newRawD > table.RawMax) { newRawD = table.RawMax; anyClamped = true; }
-
-            int byteCount = table.BytesPerElement;
-            var oldBytes = _data.Skip(addr).Take(byteCount).ToArray();
-            BinFile.WriteElement(_data, addr, table.ElementSizeBits, table.BigEndian, (long)newRawD);
-            var newBytes = _data.Skip(addr).Take(byteCount).ToArray();
-            command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
+            double newPhysical = op(physical, value);
+            WriteTableCell(table, math, addr, newPhysical, command, ref anyClamped);
         }
 
-        _history.Record(command);
-        if (anyClamped)
-            MessageBox.Show(this, "บางช่องมีค่าเกินขอบเขต ถูกปรับให้เป็นค่าขอบสุดแล้ว", "Clamped", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-        RefreshGridFromData();
-        _hex.Invalidate();
-        UpdateUndoRedoButtons();
+        FinishEdit(command, anyClamped);
     }
 
     private void ApplyRawWrite(TableDef table, int addr, long rawValue, string description)
@@ -444,6 +498,244 @@ public class EditorForm : Form
         var command = new EditCommand { Description = description };
         command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
         _history.Record(command);
+    }
+
+    /// <summary>Writes one table cell's physical value, clamping to the raw range and recording the byte change.</summary>
+    private void WriteTableCell(TableDef table, MathEquation math, int addr, double newPhysical, EditCommand command, ref bool anyClamped)
+    {
+        double newRawD = Math.Round(math.ToRaw(newPhysical));
+        if (newRawD < table.RawMin) { newRawD = table.RawMin; anyClamped = true; }
+        if (newRawD > table.RawMax) { newRawD = table.RawMax; anyClamped = true; }
+
+        int byteCount = table.BytesPerElement;
+        var oldBytes = _data.Skip(addr).Take(byteCount).ToArray();
+        BinFile.WriteElement(_data, addr, table.ElementSizeBits, table.BigEndian, (long)newRawD);
+        var newBytes = _data.Skip(addr).Take(byteCount).ToArray();
+        command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
+    }
+
+    private void FinishEdit(EditCommand command, bool anyClamped)
+    {
+        _history.Record(command);
+        if (anyClamped)
+            MessageBox.Show(this, "บางช่องมีค่าเกินขอบเขต ถูกปรับให้เป็นค่าขอบสุดแล้ว", "ค่าเกินขอบเขต", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+        RefreshGridFromData();
+        _hex.Invalidate();
+        UpdateUndoRedoButtons();
+    }
+
+    /// <summary>Dispatches the toolbar's "ฟังก์ชัน" dropdown to the matching table operation, TunerPro-style.</summary>
+    private void ExecuteFunction()
+    {
+        if (_selected == null || _grid.SelectedCells.Count == 0)
+        {
+            MessageBox.Show(this, "กรุณาเลือกช่องในตารางก่อน", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        string fn = _cmbFunction.SelectedItem as string ?? FnOffset;
+
+        if (fn == FnCopyFromCompare) { CopyFromCompare(); return; }
+        if (fn == FnSmooth) { SmoothSelection(); return; }
+        if (fn == FnInterpolateX) { InterpolateSelection(alongX: true, alongY: false); return; }
+        if (fn == FnInterpolateY) { InterpolateSelection(alongX: false, alongY: true); return; }
+        if (fn == FnInterpolateXY) { InterpolateSelection(alongX: true, alongY: true); return; }
+
+        if (!double.TryParse(_txtFunctionValue.Text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
+        {
+            MessageBox.Show(this, "กรุณาป้อนค่าตัวเลขในช่อง \"ค่า\"", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (fn == FnOffset)
+            ApplyBatchOp(fn, value, (phys, v) => phys + v);
+        else if (fn == FnMultiply)
+            ApplyBatchOp(fn, value, (phys, v) => phys * v);
+        else if (fn == FnDivide)
+        {
+            if (value == 0)
+            {
+                MessageBox.Show(this, "หารด้วยศูนย์ไม่ได้", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            ApplyBatchOp(fn, value, (phys, v) => phys / v);
+        }
+        else if (fn == FnScaleByPercent)
+            ApplyBatchOp(fn, value, (phys, v) => phys * (1.0 + v / 100.0));
+        else if (fn == FnFillWithValue)
+            ApplyBatchOp(fn, value, (_, v) => v);
+    }
+
+    /// <summary>Averages each selected cell with its up/down/left/right neighbors (read from a
+    /// pre-op snapshot so smoothing one cell doesn't cascade into the next).</summary>
+    private void SmoothSelection()
+    {
+        var table = _selected!;
+        var math = new MathEquation(table.MathEquation);
+        var cells = _grid.SelectedCells.Cast<DataGridViewCell>().ToList();
+        if (cells.Count == 0) return;
+
+        var selectedSet = cells.Select(c => (r: c.RowIndex, c: c.ColumnIndex)).Distinct().ToList();
+
+        var snapshot = new double[table.Rows, table.Cols];
+        for (int r = 0; r < table.Rows; r++)
+            for (int c = 0; c < table.Cols; c++)
+            {
+                long raw = BinFile.ReadElement(_data, ElementAddress(table, r, c), table.ElementSizeBits, table.Signed, table.BigEndian);
+                snapshot[r, c] = math.ToPhysical(raw);
+            }
+
+        var command = new EditCommand { Description = FnSmooth };
+        bool anyClamped = false;
+
+        foreach (var (r, c) in selectedSet)
+        {
+            var neighbors = new List<double> { snapshot[r, c] };
+            if (r > 0) neighbors.Add(snapshot[r - 1, c]);
+            if (r < table.Rows - 1) neighbors.Add(snapshot[r + 1, c]);
+            if (c > 0) neighbors.Add(snapshot[r, c - 1]);
+            if (c < table.Cols - 1) neighbors.Add(snapshot[r, c + 1]);
+
+            WriteTableCell(table, math, ElementAddress(table, r, c), neighbors.Average(), command, ref anyClamped);
+        }
+
+        FinishEdit(command, anyClamped);
+    }
+
+    /// <summary>Linearly interpolates selected cells between their row/column (or bounding-box corner)
+    /// endpoints, weighted by real axis value (RPM/TPS) rather than raw index — like TunerPro's Interpolate X/Y/XY.</summary>
+    private void InterpolateSelection(bool alongX, bool alongY)
+    {
+        var table = _selected!;
+        var math = new MathEquation(table.MathEquation);
+        var cells = _grid.SelectedCells.Cast<DataGridViewCell>().ToList();
+        if (cells.Count == 0) return;
+
+        double PhysicalAt(int r, int c)
+        {
+            long raw = BinFile.ReadElement(_data, ElementAddress(table, r, c), table.ElementSizeBits, table.Signed, table.BigEndian);
+            return math.ToPhysical(raw);
+        }
+
+        var command = new EditCommand { Description = alongX && alongY ? FnInterpolateXY : alongX ? FnInterpolateX : FnInterpolateY };
+        bool anyClamped = false;
+
+        if (alongX && alongY)
+        {
+            int minR = cells.Min(c => c.RowIndex), maxR = cells.Max(c => c.RowIndex);
+            int minC = cells.Min(c => c.ColumnIndex), maxC = cells.Max(c => c.ColumnIndex);
+            if (minR == maxR || minC == maxC)
+            {
+                MessageBox.Show(this, "Interpolate XY ต้องเลือกช่วงอย่างน้อย 2x2 ช่อง (มุมบน-ล่าง ซ้าย-ขวา)", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            double v00 = PhysicalAt(minR, minC), v01 = PhysicalAt(minR, maxC);
+            double v10 = PhysicalAt(maxR, minC), v11 = PhysicalAt(maxR, maxC);
+            double x0 = AxisValue(table.XAxis, minC), x1 = AxisValue(table.XAxis, maxC);
+            double y0 = AxisValue(table.YAxis, minR), y1 = AxisValue(table.YAxis, maxR);
+
+            foreach (var cell in cells)
+            {
+                int r = cell.RowIndex, c = cell.ColumnIndex;
+                if ((r == minR || r == maxR) && (c == minC || c == maxC)) continue; // corners are anchors, leave unchanged
+                double tx = x1 != x0 ? (AxisValue(table.XAxis, c) - x0) / (x1 - x0) : 0;
+                double ty = y1 != y0 ? (AxisValue(table.YAxis, r) - y0) / (y1 - y0) : 0;
+                double top = v00 + (v01 - v00) * tx;
+                double bottom = v10 + (v11 - v10) * tx;
+                WriteTableCell(table, math, ElementAddress(table, r, c), top + (bottom - top) * ty, command, ref anyClamped);
+            }
+        }
+        else if (alongX)
+        {
+            foreach (var rowGroup in cells.GroupBy(c => c.RowIndex))
+            {
+                var cols = rowGroup.Select(c => c.ColumnIndex).Distinct().OrderBy(x => x).ToList();
+                if (cols.Count < 3) continue;
+                int cMin = cols[0], cMax = cols[^1];
+                double vMin = PhysicalAt(rowGroup.Key, cMin), vMax = PhysicalAt(rowGroup.Key, cMax);
+                double xMin = AxisValue(table.XAxis, cMin), xMax = AxisValue(table.XAxis, cMax);
+                foreach (int c in cols.Skip(1).Take(cols.Count - 2))
+                {
+                    double t = xMax != xMin ? (AxisValue(table.XAxis, c) - xMin) / (xMax - xMin) : 0;
+                    WriteTableCell(table, math, ElementAddress(table, rowGroup.Key, c), vMin + (vMax - vMin) * t, command, ref anyClamped);
+                }
+            }
+        }
+        else if (alongY)
+        {
+            foreach (var colGroup in cells.GroupBy(c => c.ColumnIndex))
+            {
+                var rows = colGroup.Select(c => c.RowIndex).Distinct().OrderBy(x => x).ToList();
+                if (rows.Count < 3) continue;
+                int rMin = rows[0], rMax = rows[^1];
+                double vMin = PhysicalAt(rMin, colGroup.Key), vMax = PhysicalAt(rMax, colGroup.Key);
+                double yMin = AxisValue(table.YAxis, rMin), yMax = AxisValue(table.YAxis, rMax);
+                foreach (int r in rows.Skip(1).Take(rows.Count - 2))
+                {
+                    double t = yMax != yMin ? (AxisValue(table.YAxis, r) - yMin) / (yMax - yMin) : 0;
+                    WriteTableCell(table, math, ElementAddress(table, r, colGroup.Key), vMin + (vMax - vMin) * t, command, ref anyClamped);
+                }
+            }
+        }
+
+        if (command.Changes.Count == 0)
+        {
+            MessageBox.Show(this, "ต้องเลือกอย่างน้อย 3 ช่องต่อเนื่องกันในแถว/คอลัมน์เดียวกัน (หัว-ท้ายจะเป็นค่าอ้างอิง ตรงกลางจะถูกเชื่อมค่า)", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        FinishEdit(command, anyClamped);
+    }
+
+    /// <summary>Copies raw bytes from the loaded compare .bin into every selected cell (same address).</summary>
+    private void CopyFromCompare()
+    {
+        if (_compareData == null)
+        {
+            MessageBox.Show(this, "กรุณาโหลดไฟล์เปรียบเทียบก่อน (ปุ่ม \"โหลดไฟล์เปรียบเทียบ...\")", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var table = _selected!;
+        var cells = _grid.SelectedCells.Cast<DataGridViewCell>().ToList();
+        var command = new EditCommand { Description = $"{FnCopyFromCompare} ({_compareLabel})" };
+        int byteCount = table.BytesPerElement;
+
+        foreach (var cell in cells)
+        {
+            int addr = ElementAddress(table, cell.RowIndex, cell.ColumnIndex);
+            if (addr + byteCount > _compareData.Length) continue;
+
+            var oldBytes = _data.Skip(addr).Take(byteCount).ToArray();
+            var newBytes = _compareData.Skip(addr).Take(byteCount).ToArray();
+            if (oldBytes.SequenceEqual(newBytes)) continue;
+
+            Array.Copy(_compareData, addr, _data, addr, byteCount);
+            command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
+        }
+
+        if (command.Changes.Count == 0) return;
+        FinishEdit(command, anyClamped: false);
+    }
+
+    private void LoadCompareFile()
+    {
+        using var dlg = new OpenFileDialog { Filter = "ไฟล์ ECU BIN (*.bin)|*.bin|ไฟล์ทั้งหมด (*.*)|*.*" };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            _compareData = BinFile.Load(dlg.FileName);
+            _compareLabel = Path.GetFileName(dlg.FileName);
+            _lblCompare.Text = $"ไฟล์เปรียบเทียบ: {_compareLabel} ({_compareData.Length:N0} bytes)";
+            _lblCompare.ForeColor = Theme.Silver;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"เปิดไฟล์เปรียบเทียบไม่สำเร็จ:\n{ex.Message}", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private void RefreshSelectionFromData()
@@ -462,7 +754,7 @@ public class EditorForm : Form
     {
         using var dlg = new SaveFileDialog
         {
-            Filter = "ECU BIN files (*.bin)|*.bin|All files (*.*)|*.*",
+            Filter = "ไฟล์ ECU BIN (*.bin)|*.bin|ไฟล์ทั้งหมด (*.*)|*.*",
             FileName = Path.GetFileNameWithoutExtension(_binPath) + "_tuned.bin",
             InitialDirectory = Path.GetDirectoryName(_binPath),
         };
@@ -481,12 +773,12 @@ public class EditorForm : Form
                   "คำเตือน: ไฟล์นี้ยังไม่มีการคำนวณ checksum ใหม่\n\"ห้ามนำไป flash เข้า ECU\" จนกว่าจะทำ Phase 3 (checksum) เสร็จ"
                 : "คำเตือน: อ่านไฟล์ที่บันทึกกลับมาแล้วไม่ตรงกับข้อมูลในโปรแกรม — กรุณาตรวจสอบไฟล์ก่อนใช้งาน";
 
-            MessageBox.Show(this, msg, "Save As", MessageBoxButtons.OK,
+            MessageBox.Show(this, msg, "บันทึกไฟล์", MessageBoxButtons.OK,
                 roundTripOk ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"บันทึกไฟล์ไม่สำเร็จ:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, $"บันทึกไฟล์ไม่สำเร็จ:\n{ex.Message}", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }
