@@ -78,7 +78,8 @@ public class AfrTuneAdvisorForm : Form
             ReadOnly = true,
             RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.AutoSizeToAllHeaders,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
-            DefaultCellStyle = { Font = new Font("Consolas", 8f) },
+            DefaultCellStyle = { Font = new Font("Consolas", 9.5f), Alignment = DataGridViewContentAlignment.MiddleCenter },
+            RowTemplate = { Height = 26 },
             ShowCellErrors = false, // avoids a known WinForms crash ("Cell is not in a DataGridView")
             ShowRowErrors = false,  // when the mouse hovers a cell right as Columns/Rows get rebuilt
             ShowEditingIcon = false,
@@ -86,10 +87,14 @@ public class AfrTuneAdvisorForm : Form
         _grid.ColumnHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
         _grid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Accent;
         _grid.ColumnHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
+        _grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         _grid.RowHeadersDefaultCellStyle.BackColor = Theme.HeaderBar;
         _grid.RowHeadersDefaultCellStyle.ForeColor = Theme.Accent;
         _grid.RowHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.EnableHeadersVisualStyles = false;
+        _grid.TopLeftHeaderCell.Value = "RPM ⟍ TPS";
+        _grid.TopLeftHeaderCell.Style.Font = new Font(Theme.UiFont, FontStyle.Bold);
+        _grid.TopLeftHeaderCell.Style.ForeColor = Theme.Accent;
         _grid.CellEndEdit += Grid_CellEndEdit;
 
         BuildGridStructure();
@@ -122,10 +127,12 @@ public class AfrTuneAdvisorForm : Form
 
     private Panel BuildToolbar()
     {
-        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 130, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
+        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 178, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
+        const int row1 = 12, row2 = 56, row3 = 100, row4 = 140;
 
+        // แถว 1 — เริ่ม/หยุดบันทึก, ต่อ ECU จริง
         _btnStartStop = Theme.PrimaryButton("เริ่มบันทึก (จำลอง)");
-        _btnStartStop.Location = new Point(10, 8);
+        _btnStartStop.Location = new Point(12, row1);
         _btnStartStop.Click += BtnStartStop_Click;
 
         _liveModeCheckbox = new CheckBox
@@ -133,38 +140,13 @@ public class AfrTuneAdvisorForm : Form
             Text = "ต่อ ECU จริง (ไม่ใช่จำลอง)",
             AutoSize = true,
             ForeColor = Theme.Silver,
-            Location = new Point(230, 15),
+            Location = new Point(232, row1 + 7),
         };
         _liveModeCheckbox.CheckedChanged += (_, _) =>
             _btnStartStop.Text = _liveModeCheckbox.Checked ? "เชื่อมต่อ & เริ่มบันทึก (ECU จริง)" : "เริ่มบันทึก (จำลอง)";
 
-        var lblTarget = new Label { Text = "ค่าที่จะเติม:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(440, 15) };
-        _targetAfrInput = new NumericUpDown
-        {
-            Location = new Point(540, 11),
-            Width = 80,
-            DecimalPlaces = 1,
-            Increment = 0.1m,
-            Minimum = 10.0m,
-            Maximum = 18.0m,
-            Value = 14.7m,
-        };
-
-        _chkEditTargets = new CheckBox
-        {
-            Text = "ตั้ง AFR เป้าหมายทีละช่อง",
-            AutoSize = true,
-            ForeColor = Theme.Silver,
-            Location = new Point(640, 15),
-        };
-        _chkEditTargets.CheckedChanged += ChkEditTargets_CheckedChanged;
-
-        _btnFillTarget = Theme.StyledButton("เติมเป้าหมายเดียวกันทั้งตาราง");
-        _btnFillTarget.Location = new Point(830, 8);
-        _btnFillTarget.Click += BtnFillTarget_Click;
-
         var btnCalibIdle = Theme.StyledButton("Calibrate: ตอนนี้คือ TPS 0% (ไม่บิดคันเร่ง)");
-        btnCalibIdle.Location = new Point(10, 48);
+        btnCalibIdle.Location = new Point(470, row1);
         btnCalibIdle.Click += (_, _) =>
         {
             if (!_liveModeCheckbox.Checked || !_ecuReader.IsConnected)
@@ -177,7 +159,7 @@ public class AfrTuneAdvisorForm : Form
         _btnCalibIdle = btnCalibIdle;
 
         var btnCalibWot = Theme.StyledButton("Calibrate: ตอนนี้คือ TPS 100% (บิดสุด)");
-        btnCalibWot.Location = new Point(300, 48);
+        btnCalibWot.Location = new Point(760, row1);
         btnCalibWot.Click += (_, _) =>
         {
             if (!_liveModeCheckbox.Checked || !_ecuReader.IsConnected)
@@ -189,10 +171,42 @@ public class AfrTuneAdvisorForm : Form
         };
         _btnCalibWot = btnCalibWot;
 
+        // แถว 2 — เป้าหมาย AFR ต่อช่อง
+        var lblTarget = new Label { Text = "ค่าที่จะเติม (AFR):", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(12, row2 + 7) };
+        _targetAfrInput = new NumericUpDown
+        {
+            Location = new Point(148, row2 + 3),
+            Width = 75,
+            DecimalPlaces = 1,
+            Increment = 0.1m,
+            Minimum = 10.0m,
+            Maximum = 18.0m,
+            Value = 14.7m,
+        };
+
+        _btnFillTarget = Theme.StyledButton("เติมเป้าหมายเดียวกันทั้งตาราง");
+        _btnFillTarget.Location = new Point(238, row2);
+        _btnFillTarget.Click += BtnFillTarget_Click;
+
+        _chkEditTargets = new CheckBox
+        {
+            Text = "ตั้ง AFR เป้าหมายทีละช่อง (พิมพ์ในตารางด้านล่างได้เลย)",
+            AutoSize = true,
+            ForeColor = Theme.Accent,
+            Location = new Point(480, row2 + 7),
+        };
+        _chkEditTargets.CheckedChanged += ChkEditTargets_CheckedChanged;
+
+        // แถว 3 — คำสั่งใช้ผล + คำอธิบายสี
         _btnApply = Theme.DangerButton("ใช้คำแนะนำนี้กับตารางจริง");
-        _btnApply.Location = new Point(590, 48);
+        _btnApply.Location = new Point(12, row3);
         _btnApply.Enabled = false;
         _btnApply.Click += BtnApply_Click;
+
+        var legendSwatchRed = new Panel { BackColor = Color.FromArgb(0xD8, 0x3A, 0x2E), Size = new Size(16, 16), Location = new Point(300, row3 + 8) };
+        var legendLabelRed = new Label { Text = "= แนะนำเพิ่มน้ำมัน (บาง/AFR สูงกว่าเป้า)", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(322, row3 + 6) };
+        var legendSwatchBlue = new Panel { BackColor = Color.FromArgb(0x2F, 0x9E, 0xF0), Size = new Size(16, 16), Location = new Point(620, row3 + 8) };
+        var legendLabelBlue = new Label { Text = "= แนะนำลดน้ำมัน (เข้ม/AFR ต่ำกว่าเป้า)", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(642, row3 + 6) };
 
         var lblWarn = new Label
         {
@@ -200,13 +214,14 @@ public class AfrTuneAdvisorForm : Form
                    "ตรวจสอบด้วยเครื่องวัด wideband AFR จริงก่อนเชื่อผลเต็มที่ และดู % ที่แนะนำในตารางก่อนกด \"ใช้คำแนะนำนี้กับตารางจริง\" เสมอ",
             AutoSize = true,
             ForeColor = Theme.Warning,
-            Location = new Point(10, 88),
+            Location = new Point(12, row4),
         };
 
         bar.Controls.AddRange(new Control[]
         {
-            _btnStartStop, _liveModeCheckbox, lblTarget, _targetAfrInput, _chkEditTargets, _btnFillTarget,
-            btnCalibIdle, btnCalibWot, _btnApply, lblWarn,
+            _btnStartStop, _liveModeCheckbox, btnCalibIdle, btnCalibWot,
+            lblTarget, _targetAfrInput, _btnFillTarget, _chkEditTargets,
+            _btnApply, legendSwatchRed, legendLabelRed, legendSwatchBlue, legendLabelBlue, lblWarn,
         });
         return bar;
     }
@@ -215,6 +230,7 @@ public class AfrTuneAdvisorForm : Form
     {
         _grid.Columns.Clear();
         _grid.Rows.Clear();
+        _grid.RowHeadersWidth = 62;
 
         for (int c = 0; c < _colAxis.Length; c++)
         {
@@ -222,7 +238,7 @@ public class AfrTuneAdvisorForm : Form
             {
                 Name = $"col{c}",
                 HeaderText = _colAxis[c].ToString("0.##"),
-                Width = 46,
+                Width = 58,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
             });
         }
