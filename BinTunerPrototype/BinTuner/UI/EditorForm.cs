@@ -41,6 +41,9 @@ public class EditorForm : Form
     private const int BaseRowHeight = 22;
     private const int BaseColWidth = 56;
 
+    private readonly HashSet<(int r, int c)> _modifiedCells = new();
+    private Button _btnRevertFlag = null!;
+
     private const string FnOffset = "บวก/ลบค่า (Offset)";
     private const string FnMultiply = "คูณค่า (Multiply)";
     private const string FnDivide = "หารค่า (Divide)";
@@ -116,7 +119,9 @@ public class EditorForm : Form
         _grid.EnableHeadersVisualStyles = false;
         _grid.CellEndEdit += Grid_CellEndEdit;
         _grid.MouseWheel += Grid_MouseWheel;
+        _grid.CellPainting += Grid_CellPainting;
         Theme.EnableDoubleBuffer(_grid);
+        SetupGridContextMenu();
 
         _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 26, BackColor = Theme.HeaderBar, ForeColor = Theme.Silver, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
         _lblAxisInfo = new Label { Dock = DockStyle.Top, Height = 22, BackColor = Theme.HeaderBar, ForeColor = Theme.Accent, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
@@ -134,6 +139,11 @@ public class EditorForm : Form
 
         _lblFlagInfo = new Label { AutoSize = true, Location = new Point(24, 60), ForeColor = Theme.TextMuted };
 
+        _btnRevertFlag = Theme.StyledButton("คืนค่าเดิม");
+        _btnRevertFlag.Location = new Point(220, 20);
+        _btnRevertFlag.Visible = false;
+        _btnRevertFlag.Click += (_, _) => RevertFlagToOriginal();
+
         var lblFlagWarning = new Label
         {
             Text = "คำเตือน: บาง flag เกี่ยวข้องกับความปลอดภัย/ระบบล็อกของรถ (เช่น เซนเซอร์นิรภัยขาตั้งข้าง, ระบบล็อกสตาร์ท)\n" +
@@ -144,7 +154,7 @@ public class EditorForm : Form
         };
 
         _flagPanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Visible = false };
-        _flagPanel.Controls.AddRange(new Control[] { _chkFlag, _lblFlagInfo, lblFlagWarning });
+        _flagPanel.Controls.AddRange(new Control[] { _chkFlag, _lblFlagInfo, _btnRevertFlag, lblFlagWarning });
 
         var gridCard = Theme.CardPanel("ตารางค่า / จูน", out var gridBody);
         gridCard.Dock = DockStyle.Fill;
@@ -398,8 +408,32 @@ public class EditorForm : Form
         _suppressFlagEvents = true;
         _chkFlag.Text = flag.Name;
         _chkFlag.Checked = BinFile.ReadFlag(_data, flag.Offset, flag.Mask);
-        _lblFlagInfo.Text = $"ตำแหน่ง=0x{flag.Offset:X}    mask=0x{flag.Mask:X2}    หมวด={flag.Category}";
+
+        bool modified = _data[flag.Offset] != _original[flag.Offset];
+        _lblFlagInfo.Text = $"ตำแหน่ง=0x{flag.Offset:X}    mask=0x{flag.Mask:X2}    หมวด={flag.Category}" + (modified ? "    (แก้ไขจากค่าเดิมแล้ว)" : "");
+        _lblFlagInfo.ForeColor = modified ? Theme.Danger : Theme.TextMuted;
+        _btnRevertFlag.Visible = modified;
         _suppressFlagEvents = false;
+    }
+
+    /// <summary>Reverts the currently-selected flag's byte back to the original loaded value.</summary>
+    private void RevertFlagToOriginal()
+    {
+        if (_selectedFlag == null) return;
+        var flag = _selectedFlag;
+        if (_data[flag.Offset] == _original[flag.Offset]) return;
+
+        byte oldByte = _data[flag.Offset];
+        _data[flag.Offset] = _original[flag.Offset];
+        byte newByte = _data[flag.Offset];
+
+        var command = new EditCommand { Description = $"คืนค่าเดิม Flag: {flag.Name}" };
+        command.Changes.Add(new CellChange { Address = flag.Offset, OldBytes = new[] { oldByte }, NewBytes = new[] { newByte } });
+        _history.Record(command);
+
+        RefreshFlagFromData();
+        _hex.Invalidate();
+        UpdateUndoRedoButtons();
     }
 
     private void ChkFlag_CheckedChanged(object? sender, EventArgs e)
@@ -415,6 +449,7 @@ public class EditorForm : Form
         command.Changes.Add(new CellChange { Address = flag.Offset, OldBytes = new[] { oldByte }, NewBytes = new[] { newByte } });
         _history.Record(command);
 
+        RefreshFlagFromData();
         _hex.Invalidate();
         UpdateUndoRedoButtons();
     }
@@ -453,6 +488,7 @@ public class EditorForm : Form
             _grid.Rows[rowIdx].HeaderCell.Value = AxisHeader(table.YAxis, r);
         }
 
+        _modifiedCells.Clear();
         for (int r = 0; r < table.Rows; r++)
         {
             for (int c = 0; c < table.Cols; c++)
@@ -461,6 +497,8 @@ public class EditorForm : Form
                 var cell = _grid.Rows[r].Cells[c];
                 cell.Style.BackColor = Theme.HeatColor(norm);
                 cell.Style.ForeColor = norm > 0.65 ? Color.White : Color.Black;
+
+                if (IsCellModified(table, r, c)) _modifiedCells.Add((r, c));
             }
         }
 
@@ -641,6 +679,75 @@ public class EditorForm : Form
 
     private static int ElementAddress(TableDef table, int row, int col) =>
         table.Offset + (row * table.Cols + col) * table.BytesPerElement;
+
+    /// <summary>True if this cell's raw bytes differ from the originally-loaded file at the same address.</summary>
+    private bool IsCellModified(TableDef table, int row, int col)
+    {
+        int addr = ElementAddress(table, row, col);
+        int len = table.BytesPerElement;
+        for (int i = 0; i < len; i++)
+            if (_data[addr + i] != _original[addr + i]) return true;
+        return false;
+    }
+
+    /// <summary>Draws a red border around any cell whose value has been changed from the original file.</summary>
+    private void Grid_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+    {
+        e.Paint(e.ClipBounds, DataGridViewPaintParts.All);
+
+        if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && _modifiedCells.Contains((e.RowIndex, e.ColumnIndex)))
+        {
+            using var pen = new Pen(Theme.Danger, 2.5f);
+            var rect = e.CellBounds;
+            rect.Width -= 1;
+            rect.Height -= 1;
+            e.Graphics!.DrawRectangle(pen, rect);
+        }
+
+        e.Handled = true;
+    }
+
+    /// <summary>Right-click on a cell -> "คืนค่าเดิม (ช่องนี้)" to revert just that cell to the original file's value.</summary>
+    private void SetupGridContextMenu()
+    {
+        var menu = new ContextMenuStrip();
+        var revertItem = new ToolStripMenuItem("คืนค่าเดิม (ช่องนี้)");
+        revertItem.Click += (_, _) => RevertSelectedCellToOriginal();
+        menu.Items.Add(revertItem);
+        _grid.ContextMenuStrip = menu;
+
+        // Right-click doesn't move CurrentCell by default in DataGridView — do it ourselves so the
+        // context menu action always targets the cell the user actually right-clicked.
+        _grid.CellMouseDown += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.ColumnIndex >= 0)
+                _grid.CurrentCell = _grid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+        };
+    }
+
+    private void RevertSelectedCellToOriginal()
+    {
+        if (_selected == null || _grid.CurrentCell == null) return;
+        var table = _selected;
+        int r = _grid.CurrentCell.RowIndex, c = _grid.CurrentCell.ColumnIndex;
+        if (r < 0 || c < 0) return;
+
+        int addr = ElementAddress(table, r, c);
+        int len = table.BytesPerElement;
+        var oldBytes = _data.Skip(addr).Take(len).ToArray();
+        var newBytes = _original.Skip(addr).Take(len).ToArray();
+        if (oldBytes.SequenceEqual(newBytes)) return; // already at original, nothing to revert
+
+        Array.Copy(_original, addr, _data, addr, len);
+
+        var command = new EditCommand { Description = "คืนค่าเดิม (ช่องเดียว)" };
+        command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
+        _history.Record(command);
+
+        RefreshGridFromData();
+        _hex.Invalidate();
+        UpdateUndoRedoButtons();
+    }
 
     private void Grid_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
     {
