@@ -19,9 +19,14 @@ public class EditorForm : Form
     private readonly Label _lblTableInfo;
     private readonly Button _btnUndo;
     private readonly Button _btnRedo;
+    private readonly Panel _flagPanel;
+    private readonly CheckBox _chkFlag;
+    private readonly Label _lblFlagInfo;
 
     private TableDef? _selected;
+    private FlagDef? _selectedFlag;
     private bool _suppressGridEvents;
+    private bool _suppressFlagEvents;
 
     public EditorForm(byte[] binData, string binPath, ParsedXdf xdf)
     {
@@ -44,7 +49,11 @@ public class EditorForm : Form
             BorderStyle = BorderStyle.None,
             HideSelection = false,
         };
-        _tree.AfterSelect += (_, e) => SelectTable(e.Node?.Tag as TableDef);
+        _tree.AfterSelect += (_, e) =>
+        {
+            if (e.Node?.Tag is FlagDef flag) SelectFlag(flag);
+            else SelectTable(e.Node?.Tag as TableDef);
+        };
 
         var treePanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = new Padding(4) };
         var treeHeader = new Label { Text = "Parameter Tree", Dock = DockStyle.Top, ForeColor = Theme.Accent, Font = new Font(Theme.UiFont, FontStyle.Bold), Height = 24, TextAlign = ContentAlignment.MiddleLeft };
@@ -76,8 +85,33 @@ public class EditorForm : Form
 
         _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 26, ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(6, 0, 0, 0) };
 
+        _chkFlag = new CheckBox
+        {
+            Text = "",
+            AutoSize = true,
+            Location = new Point(24, 24),
+            Font = new Font(Theme.UiFont.FontFamily, 14f),
+            ForeColor = Theme.Silver,
+        };
+        _chkFlag.CheckedChanged += ChkFlag_CheckedChanged;
+
+        _lblFlagInfo = new Label { AutoSize = true, Location = new Point(24, 60), ForeColor = Theme.TextMuted };
+
+        var lblFlagWarning = new Label
+        {
+            Text = "คำเตือน: บาง flag เกี่ยวข้องกับความปลอดภัย/ระบบล็อกของรถ (เช่น เซนเซอร์นิรภัยขาตั้งข้าง, ระบบล็อกสตาร์ท)\n" +
+                   "เปลี่ยนแล้วอาจกระทบพฤติกรรมของรถโดยตรง โปรดตรวจสอบให้แน่ใจก่อน Save As และ flash จริง",
+            AutoSize = true,
+            Location = new Point(24, 100),
+            ForeColor = Color.FromArgb(210, 170, 60),
+        };
+
+        _flagPanel = new Panel { Dock = DockStyle.Fill, Visible = false };
+        _flagPanel.Controls.AddRange(new Control[] { _chkFlag, _lblFlagInfo, lblFlagWarning });
+
         var gridPanel = new Panel { Dock = DockStyle.Fill };
         gridPanel.Controls.Add(_grid);
+        gridPanel.Controls.Add(_flagPanel);
         gridPanel.Controls.Add(_lblTableInfo);
 
         _hex = new HexViewerControl { Dock = DockStyle.Fill, Data = _data };
@@ -112,12 +146,12 @@ public class EditorForm : Form
         var btnUndo = Theme.StyledButton("Undo");
         btnUndo.Name = "btnUndo";
         btnUndo.Location = new Point(140, 7);
-        btnUndo.Click += (_, _) => { _history.Undo(_data); UpdateUndoRedoButtons(); RefreshGridFromData(); _hex.Invalidate(); };
+        btnUndo.Click += (_, _) => { _history.Undo(_data); UpdateUndoRedoButtons(); RefreshSelectionFromData(); _hex.Invalidate(); };
 
         var btnRedo = Theme.StyledButton("Redo");
         btnRedo.Name = "btnRedo";
         btnRedo.Location = new Point(220, 7);
-        btnRedo.Click += (_, _) => { _history.Redo(_data); UpdateUndoRedoButtons(); RefreshGridFromData(); _hex.Invalidate(); };
+        btnRedo.Click += (_, _) => { _history.Redo(_data); UpdateUndoRedoButtons(); RefreshSelectionFromData(); _hex.Invalidate(); };
 
         var btnOffset = Theme.StyledButton("Offset +/-");
         btnOffset.Location = new Point(310, 7);
@@ -143,6 +177,7 @@ public class EditorForm : Form
     {
         _tree.Nodes.Clear();
         var scalarsRoot = new TreeNode("Scalars");
+        var flagsRoot = new TreeNode("Flags");
         var tablesRoot = new TreeNode("Tables");
 
         foreach (var group in _xdf.Tables.GroupBy(t => t.Category))
@@ -161,7 +196,16 @@ public class EditorForm : Form
             if (hasTable) tablesRoot.Nodes.Add(tableCat);
         }
 
+        foreach (var group in _xdf.Flags.GroupBy(f => f.Category))
+        {
+            var flagCat = new TreeNode(group.Key);
+            foreach (var f in group.OrderBy(f => f.Name))
+                flagCat.Nodes.Add(new TreeNode(f.Name) { Tag = f });
+            flagsRoot.Nodes.Add(flagCat);
+        }
+
         if (scalarsRoot.Nodes.Count > 0) _tree.Nodes.Add(scalarsRoot);
+        if (flagsRoot.Nodes.Count > 0) _tree.Nodes.Add(flagsRoot);
         if (tablesRoot.Nodes.Count > 0) _tree.Nodes.Add(tablesRoot);
         _tree.ExpandAll();
     }
@@ -184,6 +228,11 @@ public class EditorForm : Form
     private void SelectTable(TableDef? table)
     {
         _selected = table;
+        _selectedFlag = null;
+        _flagPanel.Visible = false;
+        _grid.Visible = true;
+        _lblTableInfo.Visible = true;
+
         if (table == null)
         {
             _lblTableInfo.Text = "";
@@ -197,6 +246,49 @@ public class EditorForm : Form
         _hex.SetHighlight(table.Offset, table.TotalByteLength);
         _hex.ScrollToOffset(table.Offset);
         RefreshGridFromData();
+    }
+
+    private void SelectFlag(FlagDef? flag)
+    {
+        _selectedFlag = flag;
+        _selected = null;
+        _grid.Visible = false;
+        _lblTableInfo.Visible = false;
+        _flagPanel.Visible = flag != null;
+        if (flag == null) return;
+
+        _hex.SetHighlight(flag.Offset, 1);
+        _hex.ScrollToOffset(flag.Offset);
+        RefreshFlagFromData();
+    }
+
+    private void RefreshFlagFromData()
+    {
+        if (_selectedFlag == null) return;
+        var flag = _selectedFlag;
+
+        _suppressFlagEvents = true;
+        _chkFlag.Text = flag.Name;
+        _chkFlag.Checked = BinFile.ReadFlag(_data, flag.Offset, flag.Mask);
+        _lblFlagInfo.Text = $"offset=0x{flag.Offset:X}   mask=0x{flag.Mask:X2}   category={flag.Category}";
+        _suppressFlagEvents = false;
+    }
+
+    private void ChkFlag_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (_suppressFlagEvents || _selectedFlag == null) return;
+        var flag = _selectedFlag;
+
+        byte oldByte = _data[flag.Offset];
+        BinFile.WriteFlag(_data, flag.Offset, flag.Mask, _chkFlag.Checked);
+        byte newByte = _data[flag.Offset];
+
+        var command = new EditCommand { Description = $"Flag: {flag.Name}" };
+        command.Changes.Add(new CellChange { Address = flag.Offset, OldBytes = new[] { oldByte }, NewBytes = new[] { newByte } });
+        _history.Record(command);
+
+        _hex.Invalidate();
+        UpdateUndoRedoButtons();
     }
 
     private void RefreshGridFromData()
@@ -352,6 +444,12 @@ public class EditorForm : Form
         var command = new EditCommand { Description = description };
         command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
         _history.Record(command);
+    }
+
+    private void RefreshSelectionFromData()
+    {
+        if (_selectedFlag != null) RefreshFlagFromData();
+        else if (_selected != null) RefreshGridFromData();
     }
 
     private void UpdateUndoRedoButtons()

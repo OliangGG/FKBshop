@@ -83,4 +83,21 @@ public static class BinFile
             data[address + i] = (byte)((raw >> shift) & 0xFF);
         }
     }
+
+    /// <summary>On when every bit in <paramref name="mask"/> is set in the byte at <paramref name="address"/>.</summary>
+    public static bool ReadFlag(byte[] data, int address, int mask)
+    {
+        if (address < 0 || address >= data.Length)
+            throw new ArgumentOutOfRangeException(nameof(address), "Flag falls outside the file.");
+        return (data[address] & mask) == (mask & 0xFF);
+    }
+
+    public static void WriteFlag(byte[] data, int address, int mask, bool on)
+    {
+        if (address < 0 || address >= data.Length)
+            throw new ArgumentOutOfRangeException(nameof(address), "Flag falls outside the file.");
+        data[address] = on
+            ? (byte)(data[address] | (mask & 0xFF))
+            : (byte)(data[address] & ~mask);
+    }
 }

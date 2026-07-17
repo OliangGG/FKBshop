@@ -7,4 +7,5 @@ public class ParsedXdf
     public int BaseOffset;
     public List<string> Categories = new();
     public List<TableDef> Tables = new();
+    public List<FlagDef> Flags = new();
 }

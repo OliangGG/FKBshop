@@ -27,7 +27,7 @@ public static class XdfParser
         if (header != null)
         {
             result.EcuId = header.Element("deftitle")?.Value.Trim() ?? "";
-            var baseOffsetEl = header.Element("baseoffset");
+            var baseOffsetEl = header.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, "baseoffset", StringComparison.OrdinalIgnoreCase));
             if (baseOffsetEl != null)
                 result.BaseOffset = ParseIntFlexible(baseOffsetEl.Attribute("offset")?.Value ?? "0");
 
@@ -54,7 +54,30 @@ public static class XdfParser
                 result.Tables.Add(scalar);
         }
 
+        foreach (var flagEl in root.Elements("XDFFLAG"))
+        {
+            var flag = ParseFlag(flagEl, categories);
+            if (flag != null)
+                result.Flags.Add(flag);
+        }
+
         return result;
+    }
+
+    private static FlagDef? ParseFlag(XElement flagEl, Dictionary<int, string> categories)
+    {
+        var el = flagEl.Element("EMBEDDEDDATA");
+        var addressAttr = el != null ? GetAttrCaseInsensitive(el, "mmedaddress") : null;
+        if (addressAttr == null)
+            return null;
+
+        return new FlagDef
+        {
+            Name = flagEl.Element("title")?.Value.Trim() ?? "(unnamed flag)",
+            Category = ResolveCategory(flagEl, categories),
+            Offset = ParseIntFlexible(addressAttr),
+            Mask = ParseIntFlexible(flagEl.Element("mask")?.Value ?? "0x01"),
+        };
     }
 
     private static TableDef? ParseTable(XElement tableEl, Dictionary<int, string> categories)
