@@ -86,6 +86,20 @@
       "unit": "",
       "decimalPlaces": 0,
       "verified": "byte-exact match: raw 16-bit values at 0x397A4/0x397A6 read 9650 and 9750, matching the values TunerPro's floating Limitter #2 dashboard widget showed exactly; TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 24211 confirm 1x2, 16-bit, identity equation (X)"
+    },
+    {
+      "name": "Limitter #3",
+      "category": "Limitter",
+      "offset": "0x3A93A",
+      "rows": 1,
+      "cols": 2,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X",
+      "unit": "",
+      "decimalPlaces": 0,
+      "verified": "byte-exact match: raw 16-bit values at 0x3A93A/0x3A93C read 9750 and 9750, matching the values TunerPro's floating Limitter #3 dashboard widget showed exactly; TunerPro's General/Rows/Columns/Conversion/DA Assoc tabs for XDF ID 18292 confirm 1x2, 16-bit, identity equation (X)"
     }
   ]
 }
