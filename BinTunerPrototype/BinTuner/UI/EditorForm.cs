@@ -454,11 +454,14 @@ public class EditorForm : Form
         UpdateUndoRedoButtons();
     }
 
+    /// <summary>Full rebuild — tears down Columns/Rows and recreates them. Only needed when switching
+    /// to a different table (row/col count or axis headers can change); rebuilding on every single-cell
+    /// edit reset the grid's focus/current-cell/edit-state each time, which is what made repeated
+    /// edits feel unresponsive. Use RefreshCellValuesAndColors() for updates within the same table.</summary>
     private void RefreshGridFromData()
     {
         if (_selected == null) return;
         var table = _selected;
-        var math = new MathEquation(table.MathEquation);
 
         _suppressGridEvents = true;
         _grid.Columns.Clear();
@@ -468,12 +471,35 @@ public class EditorForm : Form
             _grid.Columns.Add($"col{c}", AxisHeader(table.XAxis, c));
         _grid.RowHeadersVisible = true;
 
+        for (int r = 0; r < table.Rows; r++)
+        {
+            int rowIdx = _grid.Rows.Add();
+            _grid.Rows[rowIdx].HeaderCell.Value = AxisHeader(table.YAxis, r);
+        }
+
+        _suppressGridEvents = false;
+        RefreshCellValuesAndColors();
+        ApplyGridZoom(_gridZoom);
+    }
+
+    /// <summary>Refreshes every cell's displayed value, heatmap color, and modified-state — without
+    /// touching Columns/Rows structure, so the grid keeps its current cell/focus/scroll position.
+    /// Safe to call after any edit; cheap enough (no DataGridView structural churn) to just do the
+    /// whole table each time rather than tracking exactly which cells could have shifted the heatmap's
+    /// min/max.</summary>
+    private void RefreshCellValuesAndColors()
+    {
+        if (_selected == null) return;
+        var table = _selected;
+        var math = new MathEquation(table.MathEquation);
+
+        _suppressGridEvents = true;
+
         var values = new double[table.Rows, table.Cols];
         double min = double.MaxValue, max = double.MinValue;
 
         for (int r = 0; r < table.Rows; r++)
         {
-            var rowValues = new string[table.Cols];
             for (int c = 0; c < table.Cols; c++)
             {
                 int addr = ElementAddress(table, r, c);
@@ -482,10 +508,7 @@ public class EditorForm : Form
                 values[r, c] = physical;
                 if (physical < min) min = physical;
                 if (physical > max) max = physical;
-                rowValues[c] = physical.ToString("F" + table.DecimalPlaces);
             }
-            int rowIdx = _grid.Rows.Add(rowValues);
-            _grid.Rows[rowIdx].HeaderCell.Value = AxisHeader(table.YAxis, r);
         }
 
         _modifiedCells.Clear();
@@ -495,6 +518,7 @@ public class EditorForm : Form
             {
                 double norm = max > min ? (values[r, c] - min) / (max - min) : 0.5;
                 var cell = _grid.Rows[r].Cells[c];
+                cell.Value = values[r, c].ToString("F" + table.DecimalPlaces);
                 cell.Style.BackColor = Theme.HeatColor(norm);
                 cell.Style.ForeColor = norm > 0.65 ? Color.White : Color.Black;
 
@@ -503,7 +527,7 @@ public class EditorForm : Form
         }
 
         _suppressGridEvents = false;
-        ApplyGridZoom(_gridZoom);
+        _grid.Invalidate();
     }
 
     /// <summary>Intercepts Ctrl+scroll on the grid for zoom instead of the normal vertical scroll.</summary>
@@ -744,7 +768,7 @@ public class EditorForm : Form
         command.Changes.Add(new CellChange { Address = addr, OldBytes = oldBytes, NewBytes = newBytes });
         _history.Record(command);
 
-        RefreshGridFromData();
+        RefreshCellValuesAndColors();
         _hex.Invalidate();
         UpdateUndoRedoButtons();
     }
@@ -758,7 +782,7 @@ public class EditorForm : Form
         if (!double.TryParse(cell.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double physical))
         {
             MessageBox.Show(this, "ค่าที่ป้อนไม่ใช่ตัวเลข", "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            RefreshGridFromData();
+            RefreshCellValuesAndColors();
             return;
         }
 
@@ -774,7 +798,7 @@ public class EditorForm : Form
         if (clamped)
             MessageBox.Show(this, $"ค่าเกินขอบเขตของชนิดข้อมูล ({table.RawMin}..{table.RawMax}) — ปรับให้เป็นค่าขอบสุดแล้ว", "ค่าเกินขอบเขต", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-        RefreshGridFromData();
+        RefreshCellValuesAndColors();
         _hex.Invalidate();
         UpdateUndoRedoButtons();
     }
@@ -832,7 +856,7 @@ public class EditorForm : Form
         if (anyClamped)
             MessageBox.Show(this, "บางช่องมีค่าเกินขอบเขต ถูกปรับให้เป็นค่าขอบสุดแล้ว", "ค่าเกินขอบเขต", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-        RefreshGridFromData();
+        RefreshCellValuesAndColors();
         _hex.Invalidate();
         UpdateUndoRedoButtons();
     }
@@ -1053,7 +1077,7 @@ public class EditorForm : Form
     private void RefreshSelectionFromData()
     {
         if (_selectedFlag != null) RefreshFlagFromData();
-        else if (_selected != null) RefreshGridFromData();
+        else if (_selected != null) RefreshCellValuesAndColors();
     }
 
     private void UpdateUndoRedoButtons()
