@@ -128,8 +128,8 @@ public class AfrTuneAdvisorForm : Form
 
     private Panel BuildToolbar()
     {
-        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 178, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
-        const int row1 = 12, row2 = 56, row3 = 100, row4 = 140;
+        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 212, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
+        const int row1 = 12, row2 = 56, row2b = 90, row3 = 130, row4 = 170;
 
         // แถว 1 — เริ่ม/หยุดบันทึก, ต่อ ECU จริง
         _btnStartStop = Theme.PrimaryButton("เริ่มบันทึก (จำลอง)");
@@ -189,12 +189,24 @@ public class AfrTuneAdvisorForm : Form
         _btnFillTarget.Location = new Point(238, row2);
         _btnFillTarget.Click += BtnFillTarget_Click;
 
+        var btnAutoTarget = Theme.PrimaryButton("ตั้งเป้าอัตโนมัติตามโซน RPM/TPS");
+        btnAutoTarget.Location = new Point(480, row2);
+        btnAutoTarget.Click += BtnAutoTarget_Click;
+
+        var lblAutoHint = new Label
+        {
+            Text = "(เดินเบา~1.00 → เร่งปานกลาง~0.90 → บิดสุด/รอบสูง~0.82 ตามค่าที่ใส่ด้านซ้ายเป็นฐาน)",
+            AutoSize = true,
+            ForeColor = Theme.TextMuted,
+            Location = new Point(12, row2b),
+        };
+
         _chkEditTargets = new CheckBox
         {
             Text = "ตั้ง AFR เป้าหมายทีละช่อง (พิมพ์ในตารางด้านล่างได้เลย)",
             AutoSize = true,
             ForeColor = Theme.Accent,
-            Location = new Point(480, row2 + 7),
+            Location = new Point(12, row2b + 20),
         };
         _chkEditTargets.CheckedChanged += ChkEditTargets_CheckedChanged;
 
@@ -221,7 +233,7 @@ public class AfrTuneAdvisorForm : Form
         bar.Controls.AddRange(new Control[]
         {
             _btnStartStop, _liveModeCheckbox, btnCalibIdle, btnCalibWot,
-            lblTarget, _targetAfrInput, _btnFillTarget, _chkEditTargets,
+            lblTarget, _targetAfrInput, _btnFillTarget, btnAutoTarget, lblAutoHint, _chkEditTargets,
             _btnApply, legendSwatchRed, legendLabelRed, legendSwatchBlue, legendLabelBlue, lblWarn,
         });
         return bar;
@@ -414,6 +426,56 @@ public class AfrTuneAdvisorForm : Form
 
         if (_editingTargets) RefreshTargetEditGrid();
         else RefreshSuggestions();
+    }
+
+    /// <summary>Auto-fills per-cell target AFR from a TPS%-based lambda curve (idle~1.00 -> WOT~0.82),
+    /// matching the idle/cruise/accel/full-throttle pattern common in real tuning (and in the user's
+    /// own ARTTUNER screenshot: idle 0.98 / cruise 1.00 / accel 0.91 / full 0.85) — richens further at
+    /// high RPM+high TPS combined, mirroring the enrichment logic already used for the AFR estimate.
+    /// "ค่าที่จะเติม (AFR)" is treated as the stoichiometric/reference AFR the curve scales down from.</summary>
+    private void BtnAutoTarget_Click(object? sender, EventArgs e)
+    {
+        double baseAfr = (double)_targetAfrInput.Value;
+        for (int r = 0; r < _rowAxis.Length; r++)
+        {
+            for (int c = 0; c < _colAxis.Length; c++)
+            {
+                double lambda = AutoTargetLambda(_colAxis[c], _rowAxis[r]);
+                _targetAfr[r, c] = baseAfr * lambda;
+            }
+        }
+
+        if (_editingTargets) RefreshTargetEditGrid();
+        else RefreshSuggestions();
+    }
+
+    private static double AutoTargetLambda(double tpsPercent, double rpm)
+    {
+        // Piecewise-linear anchor points: (TPS%, target lambda)
+        var points = new (double tps, double lambda)[]
+        {
+            (0, 1.00), (15, 0.95), (40, 0.90), (70, 0.85), (100, 0.82),
+        };
+
+        double lambda = points[^1].lambda;
+        for (int i = 0; i < points.Length - 1; i++)
+        {
+            var (t0, l0) = points[i];
+            var (t1, l1) = points[i + 1];
+            if (tpsPercent <= t1)
+            {
+                double frac = t1 > t0 ? (tpsPercent - t0) / (t1 - t0) : 0;
+                lambda = l0 + (l1 - l0) * Math.Clamp(frac, 0, 1);
+                break;
+            }
+        }
+
+        // Extra richness margin at high RPM combined with high load (engine protection, matches the
+        // "highRpmEnrichment" idea already used in HondaEcuReader's AFR estimate formula)
+        if (rpm > 7000 && tpsPercent > 50)
+            lambda -= 0.02 * Math.Min(1.0, (rpm - 7000) / 3000.0);
+
+        return Math.Clamp(lambda, 0.75, 1.05);
     }
 
     /// <summary>Shows the per-cell target AFR table for editing (blue tint distinguishes it from the suggestion view).</summary>
