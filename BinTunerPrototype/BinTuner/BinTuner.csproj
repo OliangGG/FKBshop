@@ -8,7 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>BinTuner</RootNamespace>
-    <AssemblyName>BinTuner</AssemblyName>
+    <AssemblyName>FKBtuner</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

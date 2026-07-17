@@ -52,7 +52,7 @@ public class EditorForm : Form
         _binPath = binPath;
         _xdf = xdf;
 
-        Text = $"BinTuner — แก้ตาราง ECU — {Path.GetFileName(binPath)}";
+        Text = $"FKBtuner — แก้ตาราง ECU — {Path.GetFileName(binPath)}";
         Theme.Apply(this);
         BackColor = Theme.Background;
         WindowState = FormWindowState.Maximized;

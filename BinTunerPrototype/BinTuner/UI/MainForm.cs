@@ -18,7 +18,7 @@ public class MainForm : Form
 
     public MainForm()
     {
-        Text = "BinTuner — เครื่องมือแก้ไฟล์ ECU มอเตอร์ไซค์ฮอนด้า (.bin/.xdf)";
+        Text = "FKBtuner — เครื่องมือแก้ไฟล์ ECU มอเตอร์ไซค์ฮอนด้า (.bin/.xdf)";
         Theme.Apply(this);
         BackColor = Theme.Background;
         Width = 640;
@@ -30,7 +30,7 @@ public class MainForm : Form
         var headerBar = new BorderedPanel { Dock = DockStyle.Top, Height = 56, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
         var lblTitle = new Label
         {
-            Text = "BinTuner",
+            Text = "FKBtuner",
             ForeColor = Theme.Accent,
             Font = new Font(Theme.UiFont.FontFamily, 15f, FontStyle.Bold),
             AutoSize = true,
@@ -137,7 +137,7 @@ public class MainForm : Form
         string presetsDir = Path.Combine(AppContext.BaseDirectory, "Presets");
         using var dlg = new OpenFileDialog
         {
-            Filter = "BinTuner preset (*.json)|*.json|ไฟล์ทั้งหมด (*.*)|*.*",
+            Filter = "FKBtuner preset (*.json)|*.json|ไฟล์ทั้งหมด (*.*)|*.*",
             InitialDirectory = Directory.Exists(presetsDir) ? presetsDir : AppContext.BaseDirectory,
         };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
