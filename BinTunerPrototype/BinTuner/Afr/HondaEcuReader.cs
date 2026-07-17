@@ -245,6 +245,14 @@ namespace BinTuner.Afr
             return string.Concat(resp[5..10].Select(b => b.ToString("X2")));
         }
 
+        /// <summary>Whatever came back from the last table-0x20 (O2 experimental) query, unfiltered —
+        /// stored even when the frame doesn't pass the strict checks below, so a debug view can show
+        /// every raw byte for the user to eyeball against TunerPro's real O2(V)/AFR reading live.
+        /// Confirmed via real TunerPro packet capture + screen recording (2026-07-14) that this ECU
+        /// DOES send genuine O2 sensor data on table 0x20 — the earlier "no real O2 byte found" note
+        /// was wrong. What's still unconfirmed is the exact byte offset/scale, hence this debug hook.</summary>
+        public byte[]? LastO2RawResponse { get; private set; }
+
         /// <summary>
         /// อ่านค่า O2 sensor voltage แบบทดลอง จาก table 20 (สเกลที่ใช้ตอนนี้เป็นการประมาณ
         /// จากการเทียบ byte pattern กับค่าที่เห็นจริงใน TunerPro dashboard - ยังไม่ยืนยัน 100%
@@ -260,9 +268,11 @@ namespace BinTuner.Afr
             _ftdi.Purge(FTDI.FT_PURGE.FT_PURGE_RX);
             WriteBytes(request);
             var raw = ReadAvailable(90);
-            if (raw == null) return null;
+            if (raw == null) { LastO2RawResponse = null; return null; }
 
             var resp = StripEcho(raw, request);
+            LastO2RawResponse = resp; // keep raw bytes regardless of whether the checks below pass
+
             if (resp.Length < 6 || !VerifyChecksum(resp)) return null;
             if (resp[0] != 0x02 || resp[3] != 0x20) return null;
 

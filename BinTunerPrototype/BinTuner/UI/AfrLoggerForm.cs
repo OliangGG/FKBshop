@@ -10,10 +10,12 @@ namespace BinTuner.UI;
 /// (AFR/Lambda เฉลี่ย, ส่วนต่างจาก Lambda เป้าหมาย, จำนวนตัวอย่าง) — Export CSV ออกไปเทียบกับตารางที่
 /// จูนใน FKBtuner ได้ หรือกดปุ่ม "แนะนำการจูนจาก AFR..." ในหน้าแก้ตารางเพื่อขอคำแนะนำโดยตรง
 ///
-/// คำเตือนสำคัญ: ECU รุ่นที่ทดสอบ (Honda K3MH-T71) ไม่พบตำแหน่ง byte ของเซนเซอร์ O2 จริงในโปรโตคอล
-/// K-line ที่ใช้ (สแกน+ดักฟังหลายรอบแล้วไม่เจอ) ค่า "AFR" ที่แสดงในนี้จึงเป็น "ค่าประมาณการ" ที่คำนวณ
-/// จาก RPM/TPS เท่านั้น ไม่ใช่ค่าจริงจากเซนเซอร์วัดไอเสีย — ใช้เป็นตัวช่วยดูแนวโน้มคร่าวๆ ได้ แต่ไม่ควร
-/// เชื่อเท่าการวัดด้วยเครื่อง wideband AFR จริงข้างรถ
+/// อัปเดต (ยืนยันจาก TunerPro packet capture + วิดีโอหน้าจอจริง 2026-07-14): ECU ตัวนี้ **มี** เซนเซอร์ O2
+/// จริงส่งออกทาง table 0x20 — ค่าที่เห็นสัมพันธ์กับ AFR ที่ TunerPro แสดงตรงตามหลักฟิสิกส์ของเซนเซอร์
+/// narrowband จริง (แรงดันต่ำ=บาง, แรงดันสูง=เข้ม) ข้อสรุปเดิมที่ว่า "หาไม่เจอ" นั้นผิด — แค่ยังไม่ยืนยัน
+/// byte offset/scale ที่แน่นอนในโค้ดนี้ 100% เท่านั้น (ใช้ปุ่ม "แสดง Raw Bytes (Debug)" เทียบกับ TunerPro
+/// สดๆ เพื่อหา byte ที่ถูกต้อง) จนกว่าจะยืนยันแน่ชัด ค่า "AFR" ในตารางยังคงเป็นค่าประมาณการจาก RPM/TPS
+/// เหมือนเดิม ไม่ใช่ค่าจากเซนเซอร์จริงโดยตรง
 /// </summary>
 public class AfrLoggerForm : Form
 {
@@ -67,6 +69,10 @@ public class AfrLoggerForm : Form
     private ComboBox _cmbDisplayMode = null!;
     private bool _running = false;
     private (int row, int col)? _lastHighlighted = null;
+
+    private CheckBox _chkShowRawO2Debug = null!;
+    private Label _lblRawO2Debug = null!;
+    private bool _showRawO2Debug;
 
     private Panel _tabLiveGraph = null!;
     private Panel _tabFuelMap = null!;
@@ -128,7 +134,7 @@ public class AfrLoggerForm : Form
 
     private Panel BuildToolbar()
     {
-        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 172, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
+        var bar = new BorderedPanel { Dock = DockStyle.Top, Height = 218, BackColor = Theme.HeaderBar, Padding = new Padding(0, 0, 0, 1) };
 
         _btnStartStop = Theme.PrimaryButton("เริ่มจับข้อมูล (จำลอง)");
         _btnStartStop.Location = new Point(10, 8);
@@ -214,18 +220,38 @@ public class AfrLoggerForm : Form
 
         var lblWarn = new Label
         {
-            Text = "AFR ที่แสดงเป็น \"ค่าประมาณการ\" คำนวณจาก RPM/TPS เท่านั้น ไม่ใช่ค่าจริงจากเซนเซอร์ O2 " +
-                   "(ECU รุ่นนี้ไม่พบตำแหน่งค่า O2 ดิบในโปรโตคอล) ใช้ดูแนวโน้มได้ แต่ควรเทียบกับเครื่องวัด wideband จริงก่อนปรับจูนตาม",
+            Text = "AFR ที่แสดงในตารางยังเป็น \"ค่าประมาณการ\" จาก RPM/TPS อยู่ — ยืนยันแล้วว่า ECU ตัวนี้มี O2 จริงส่งทาง table 0x20 " +
+                   "แต่ยังไม่ยืนยัน byte/scale ที่แน่นอน 100% (ใช้ปุ่ม Raw Bytes Debug ด้านล่างเทียบกับ TunerPro สดๆ)",
             AutoSize = true,
             ForeColor = Theme.Warning,
             Location = new Point(590, 90),
             MaximumSize = new Size(650, 0),
         };
 
+        _chkShowRawO2Debug = new CheckBox
+        {
+            Text = "แสดง Raw Bytes (Debug table 0x20 / O2) — เทียบกับ TunerPro สดๆ",
+            AutoSize = true,
+            ForeColor = Theme.Accent,
+            Location = new Point(10, 128),
+        };
+        _chkShowRawO2Debug.CheckedChanged += (_, _) => _showRawO2Debug = _chkShowRawO2Debug.Checked;
+
+        _lblRawO2Debug = new Label
+        {
+            Text = "(ต่อ ECU จริงแล้วติ๊กช่องด้านบนเพื่อดู)",
+            AutoSize = true,
+            Font = Theme.MonoFont,
+            ForeColor = Theme.Silver,
+            Location = new Point(10, 150),
+            MaximumSize = new Size(1300, 0),
+        };
+
         bar.Controls.AddRange(new Control[]
         {
             _btnStartStop, btnClear, btnExport, _liveModeCheckbox, lblRedline, _redlineInput,
             btnCalibIdle, btnCalibWot, lblFuel, _cmbFuelType, lblStoich, _stoichInput,
+            _chkShowRawO2Debug, _lblRawO2Debug,
             lblTargetLambda, _targetLambdaInput, lblDisplayMode, _cmbDisplayMode,
             _ecuIdLabel, _liveLabel, lblWarn,
         });
@@ -571,6 +597,10 @@ public class AfrLoggerForm : Form
                     _sharedAfr = afr;
                     _sharedHasData = true;
                 }
+
+                // Alternate with table 0x20 (O2 experimental) the same way TunerPro itself does,
+                // per the real packet capture — this also keeps LastO2RawResponse fresh for the debug view.
+                if (_showRawO2Debug) _ecuReader.PollO2VoltageIfDue();
             }
             else
             {
@@ -678,6 +708,9 @@ public class AfrLoggerForm : Form
         string liveText = $"RPM: {_displayRpm,6:0}   TPS: {_displayTps,5:0.0}°   {afrLabel}: {_displayAfr,5:0.00}   Lambda: {lambdaNow,4:0.00}{rawTpsInfo}";
         _liveLabel.Text = liveText;
         _bigLiveLabel.Text = liveText;
+
+        if (_showRawO2Debug && _liveModeCheckbox.Checked)
+            _lblRawO2Debug.Text = FormatRawO2Debug(_ecuReader.LastO2RawResponse);
 
         int rpmBin = (int)(_displayRpm / RpmBinSize);
         int tpsBin = AfrLogger.GetTpsBinIndex(_displayTps);
@@ -845,6 +878,21 @@ public class AfrLoggerForm : Form
     {
         double t = Math.Clamp(count / 30.0, 0, 1);
         return Lerp(Color.White, Theme.Accent, 0.2 + 0.8 * t);
+    }
+
+    /// <summary>Shows every raw byte of the last table-0x20 response, hex + decimal + ×0.02 (today's
+    /// guessed O2 scale), so it can be read off next to TunerPro's live O2(V) to find the real byte.</summary>
+    private static string FormatRawO2Debug(byte[]? resp)
+    {
+        if (resp == null || resp.Length == 0) return "(ยังไม่มีข้อมูลตอบกลับจาก table 0x20)";
+
+        var parts = new List<string>();
+        for (int i = 0; i < resp.Length; i++)
+        {
+            byte b = resp[i];
+            parts.Add($"[{i}]=0x{b:X2}({b,3}) x0.02={b * 0.02:0.00}");
+        }
+        return $"table 0x20 raw ({resp.Length} bytes): " + string.Join("   ", parts);
     }
 
     private static Color Lerp(Color a, Color b, double t)
