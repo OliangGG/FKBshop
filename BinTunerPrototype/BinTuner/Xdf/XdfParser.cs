@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Xml.Linq;
 using BinTuner.Models;
 
@@ -13,6 +14,20 @@ namespace BinTuner.Xdf;
 /// </summary>
 public static class XdfParser
 {
+    static XdfParser()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
+    private sealed class LinkedAxis
+    {
+        public int Address;
+        public int SizeBits;
+        public bool Signed;
+        public bool BigEndian;
+        public string Equation = "X";
+    }
+
     public static ParsedXdf Parse(string path)
     {
         var doc = XDocument.Load(path);
@@ -26,7 +41,7 @@ public static class XdfParser
         var header = root.Element("XDFHEADER");
         if (header != null)
         {
-            result.EcuId = header.Element("deftitle")?.Value.Trim() ?? "";
+            result.EcuId = FixThaiMojibake(header.Element("deftitle")?.Value.Trim() ?? "");
             var baseOffsetEl = header.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, "baseoffset", StringComparison.OrdinalIgnoreCase));
             if (baseOffsetEl != null)
                 result.BaseOffset = ParseIntFlexible(baseOffsetEl.Attribute("offset")?.Value ?? "0");
@@ -34,15 +49,30 @@ public static class XdfParser
             foreach (var cat in header.Elements("CATEGORY"))
             {
                 int idx = ParseIntFlexible(cat.Attribute("index")?.Value ?? "0");
-                string name = cat.Attribute("name")?.Value ?? $"Category {idx}";
+                string name = FixThaiMojibake(cat.Attribute("name")?.Value ?? $"Category {idx}");
                 categories[idx] = name;
                 result.Categories.Add(name);
             }
         }
 
+        // Pre-pass: index every XDFTABLE's z-axis by uniqueid, so axes that link to a shared
+        // breakpoint table (via <embedinfo type="3" linkobjid="0x..."/>) can resolve the real
+        // address/size/equation instead of the placeholder EMBEDDEDDATA some XDFs repeat locally.
+        var linkedAxes = new Dictionary<string, LinkedAxis>(StringComparer.OrdinalIgnoreCase);
         foreach (var tableEl in root.Elements("XDFTABLE"))
         {
-            var table = ParseTable(tableEl, categories);
+            string? uid = tableEl.Attribute("uniqueid")?.Value;
+            if (uid == null) continue;
+            var zEl = tableEl.Elements("XDFAXIS").FirstOrDefault(a => a.Attribute("id")?.Value.Equals("z", StringComparison.OrdinalIgnoreCase) == true);
+            if (zEl == null) continue;
+            var (addr, sizeBits, signed, bigEndian) = ParseEmbeddedData(zEl);
+            if (addr == null) continue;
+            linkedAxes[uid] = new LinkedAxis { Address = addr.Value, SizeBits = sizeBits, Signed = signed, BigEndian = bigEndian, Equation = ParseMathEquation(zEl) };
+        }
+
+        foreach (var tableEl in root.Elements("XDFTABLE"))
+        {
+            var table = ParseTable(tableEl, categories, linkedAxes);
             if (table != null)
                 result.Tables.Add(table);
         }
@@ -73,14 +103,14 @@ public static class XdfParser
 
         return new FlagDef
         {
-            Name = flagEl.Element("title")?.Value.Trim() ?? "(unnamed flag)",
+            Name = FixThaiMojibake(flagEl.Element("title")?.Value.Trim() ?? "(unnamed flag)"),
             Category = ResolveCategory(flagEl, categories),
             Offset = ParseIntFlexible(addressAttr),
             Mask = ParseIntFlexible(flagEl.Element("mask")?.Value ?? "0x01"),
         };
     }
 
-    private static TableDef? ParseTable(XElement tableEl, Dictionary<int, string> categories)
+    private static TableDef? ParseTable(XElement tableEl, Dictionary<int, string> categories, Dictionary<string, LinkedAxis> linkedAxes)
     {
         var axes = tableEl.Elements("XDFAXIS").ToList();
         var zEl = axes.FirstOrDefault(a => a.Attribute("id")?.Value.Equals("z", StringComparison.OrdinalIgnoreCase) == true);
@@ -104,7 +134,7 @@ public static class XdfParser
 
         var table = new TableDef
         {
-            Name = tableEl.Element("title")?.Value.Trim() ?? "(unnamed table)",
+            Name = FixThaiMojibake(tableEl.Element("title")?.Value.Trim() ?? "(unnamed table)"),
             Category = ResolveCategory(tableEl, categories),
             Offset = address.Value,
             Rows = rows,
@@ -113,11 +143,11 @@ public static class XdfParser
             Signed = signed,
             BigEndian = bigEndian,
             MathEquation = ParseMathEquation(zEl),
-            Unit = zEl.Element("units")?.Value.Trim() ?? "",
+            Unit = FixThaiMojibake(zEl.Element("units")?.Value.Trim() ?? ""),
             DecimalPlaces = ParseIntFlexible(zEl.Element("decimalpl")?.Value ?? "2"),
             Kind = ParamKind.Table,
-            XAxis = xEl != null ? ParseAxis(xEl, "TPS/Column") : null,
-            YAxis = yEl != null ? ParseAxis(yEl, "RPM/Row") : null,
+            XAxis = xEl != null ? ParseAxis(xEl, "TPS/Column", linkedAxes) : null,
+            YAxis = yEl != null ? ParseAxis(yEl, "RPM/Row", linkedAxes) : null,
         };
         return table;
     }
@@ -130,7 +160,7 @@ public static class XdfParser
 
         return new TableDef
         {
-            Name = constEl.Element("title")?.Value.Trim() ?? "(unnamed scalar)",
+            Name = FixThaiMojibake(constEl.Element("title")?.Value.Trim() ?? "(unnamed scalar)"),
             Category = ResolveCategory(constEl, categories),
             Offset = address.Value,
             Rows = 1,
@@ -139,16 +169,29 @@ public static class XdfParser
             Signed = signed,
             BigEndian = bigEndian,
             MathEquation = ParseMathEquation(constEl),
-            Unit = constEl.Element("units")?.Value.Trim() ?? "",
+            Unit = FixThaiMojibake(constEl.Element("units")?.Value.Trim() ?? ""),
             DecimalPlaces = ParseIntFlexible(constEl.Element("decimalpl")?.Value ?? "2"),
             Kind = ParamKind.Scalar,
         };
     }
 
-    private static AxisDef ParseAxis(XElement axisEl, string defaultLabel)
+    private static AxisDef ParseAxis(XElement axisEl, string defaultLabel, Dictionary<string, LinkedAxis> linkedAxes)
     {
         var (address, sizeBits, signed, bigEndian) = ParseEmbeddedData(axisEl);
+        string equation = ParseMathEquation(axisEl);
         int count = ParseIntFlexible(axisEl.Element("indexcount")?.Value ?? "0");
+
+        // A linked axis (shared breakpoint scale) overrides whatever placeholder EMBEDDEDDATA
+        // this XDFAXIS carries locally — TunerPro treats the linked object as authoritative.
+        var linkObjId = axisEl.Element("embedinfo")?.Attribute("linkobjid")?.Value;
+        if (linkObjId != null && linkedAxes.TryGetValue(linkObjId, out var linked))
+        {
+            address = linked.Address;
+            sizeBits = linked.SizeBits;
+            signed = linked.Signed;
+            bigEndian = linked.BigEndian;
+            equation = linked.Equation;
+        }
 
         var labels = axisEl.Elements("LABEL").ToList();
         double[]? staticValues = null;
@@ -173,8 +216,8 @@ public static class XdfParser
             ElementSizeBits = sizeBits,
             Signed = signed,
             BigEndian = bigEndian,
-            MathEquation = ParseMathEquation(axisEl),
-            Unit = axisEl.Element("units")?.Value.Trim() ?? "",
+            MathEquation = equation,
+            Unit = FixThaiMojibake(axisEl.Element("units")?.Value.Trim() ?? ""),
         };
     }
 
@@ -227,5 +270,33 @@ public static class XdfParser
         if (s.StartsWith("-0x", StringComparison.OrdinalIgnoreCase))
             return -Convert.ToInt32(s[3..], 16);
         return int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    /// <summary>
+    /// Some of these XDFs write Thai text as raw Windows-874 codepage byte values wrapped in
+    /// numeric XML character references (e.g. "&#164;&#232;&#210;") instead of real Unicode.
+    /// The XML parser decodes those as literal code points 0-255 (ASCII/Latin-1 range), so the
+    /// resulting string's char values equal the original CP874 bytes — reinterpreting them
+    /// through the CP874 codepage recovers the real Thai text. ASCII text is unaffected since
+    /// CP874 is ASCII-compatible below 128, so this is safe to apply unconditionally.
+    /// </summary>
+    private static string FixThaiMojibake(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return s;
+        var bytes = new byte[s.Length];
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (c > 255) return s; // already real Unicode text (e.g. not mojibake) — leave alone
+            bytes[i] = (byte)c;
+        }
+        try
+        {
+            return Encoding.GetEncoding(874).GetString(bytes);
+        }
+        catch
+        {
+            return s;
+        }
     }
 }
