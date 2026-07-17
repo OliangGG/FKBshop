@@ -16,6 +16,7 @@ public class EditorForm : Form
     private readonly TreeView _tree;
     private readonly DataGridView _grid;
     private readonly HexViewerControl _hex;
+    private readonly SplitContainer _rightSplit;
     private readonly Label _lblTableInfo;
     private readonly Button _btnUndo;
     private readonly Button _btnRedo;
@@ -144,17 +145,18 @@ public class EditorForm : Form
         hexBody.Padding = new Padding(2);
         hexBody.Controls.Add(_hex);
 
-        var rightSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 460, BackColor = Theme.Background, SplitterWidth = 6 };
-        rightSplit.Panel1.BackColor = Theme.Background;
-        rightSplit.Panel2.BackColor = Theme.Background;
-        rightSplit.Panel1.Controls.Add(gridCard);
-        rightSplit.Panel2.Controls.Add(hexCard);
+        _rightSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 460, BackColor = Theme.Background, SplitterWidth = 6 };
+        _rightSplit.Panel1.BackColor = Theme.Background;
+        _rightSplit.Panel2.BackColor = Theme.Background;
+        _rightSplit.Panel1.Controls.Add(gridCard);
+        _rightSplit.Panel2.Controls.Add(hexCard);
+        _rightSplit.Panel2Collapsed = true; // Hex view is off by default — optional, toggled from the toolbar
 
-        var mainSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 260, BackColor = Theme.Background, SplitterWidth = 6 };
+        var mainSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 360, BackColor = Theme.Background, SplitterWidth = 6 };
         mainSplit.Panel1.BackColor = Theme.Background;
         mainSplit.Panel2.BackColor = Theme.Background;
         mainSplit.Panel1.Controls.Add(treeCard);
-        mainSplit.Panel2.Controls.Add(rightSplit);
+        mainSplit.Panel2.Controls.Add(_rightSplit);
 
         var contentWrap = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background, Padding = new Padding(8, 6, 8, 8) };
         contentWrap.Controls.Add(mainSplit);
@@ -208,6 +210,17 @@ public class EditorForm : Form
             Location = new Point(665, 16),
         };
 
+        var chkShowHex = new CheckBox
+        {
+            Name = "chkShowHex",
+            Text = "แสดงมุมมอง Hex (ไบต์ดิบ)",
+            AutoSize = true,
+            ForeColor = Theme.Silver,
+            Checked = false,
+            Location = new Point(900, 14),
+        };
+        chkShowHex.CheckedChanged += (_, _) => _rightSplit.Panel2Collapsed = !chkShowHex.Checked;
+
         // Row 2 — ปรับค่าตาราง (แบบเดียวกับ TunerPro): ฟังก์ชัน / ค่า / ทำงาน
         var lblFn = new Label { Text = "ฟังก์ชัน:", AutoSize = true, ForeColor = Theme.Silver, Location = new Point(10, 60) };
 
@@ -243,7 +256,7 @@ public class EditorForm : Form
 
         bar.Controls.AddRange(new Control[]
         {
-            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare,
+            btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare, chkShowHex,
             lblFn, cmbFunction, lblVal, txtValue, btnExecute, lblHint,
         });
         return bar;
