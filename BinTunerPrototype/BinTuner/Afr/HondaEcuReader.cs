@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using FTD2XX_NET;
 
@@ -21,6 +22,20 @@ namespace BinTuner.Afr
     /// </summary>
     public class HondaEcuReader : IDisposable
     {
+        // Windows' default scheduler tick is ~15.6ms, so Thread.Sleep(1) in the poll loop below can
+        // actually sleep up to ~15ms — this alone was likely the single biggest source of the "laggy"
+        // feel reported when connected to a real ECU (the K-line request/response itself is fast;
+        // it was the polling wait between checking for bytes that was slow). timeBeginPeriod(1) asks
+        // Windows for ~1ms scheduler granularity for the life of this process, same trick games/audio
+        // apps use. Must be paired with timeEndPeriod when done (see Dispose).
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod", SetLastError = true)]
+        private static extern uint TimeBeginPeriod(uint uMilliseconds);
+
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod", SetLastError = true)]
+        private static extern uint TimeEndPeriod(uint uMilliseconds);
+
+        private bool _highResTimerActive;
+
         private readonly FTDI _ftdi = new FTDI();
         private const int KeepAliveMs = 20000;
         private DateTime _lastSuccessTime = DateTime.MinValue;
@@ -53,6 +68,16 @@ namespace BinTuner.Afr
 
         public void Open(uint deviceIndex = 0)
         {
+            try
+            {
+                TimeBeginPeriod(1);
+                _highResTimerActive = true;
+            }
+            catch
+            {
+                // ถ้าเรียกไม่ได้ (เช่น รันบน OS อื่น) ก็ไม่เป็นไร แค่จะกลับไปมี polling latency แบบเดิม
+            }
+
             var status = _ftdi.OpenByIndex(deviceIndex);
             if (status != FTDI.FT_STATUS.FT_OK)
                 throw new Exception($"เปิดอุปกรณ์ FTDI ไม่สำเร็จ: {status}");
@@ -322,6 +347,12 @@ namespace BinTuner.Afr
         public void Dispose()
         {
             _ftdi.Close();
+
+            if (_highResTimerActive)
+            {
+                try { TimeEndPeriod(1); } catch { /* best-effort cleanup */ }
+                _highResTimerActive = false;
+            }
         }
     }
 }
