@@ -18,6 +18,7 @@ public class EditorForm : Form
     private readonly HexViewerControl _hex;
     private readonly SplitContainer _rightSplit;
     private readonly Label _lblTableInfo;
+    private readonly Label _lblAxisInfo;
     private readonly Button _btnUndo;
     private readonly Button _btnRedo;
     private readonly Panel _flagPanel;
@@ -106,7 +107,8 @@ public class EditorForm : Form
         _grid.EnableHeadersVisualStyles = false;
         _grid.CellEndEdit += Grid_CellEndEdit;
 
-        _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 28, BackColor = Theme.HeaderBar, ForeColor = Theme.Silver, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
+        _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 26, BackColor = Theme.HeaderBar, ForeColor = Theme.Silver, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
+        _lblAxisInfo = new Label { Dock = DockStyle.Top, Height = 22, BackColor = Theme.HeaderBar, ForeColor = Theme.Accent, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
 
         _chkFlag = new CheckBox
         {
@@ -137,6 +139,7 @@ public class EditorForm : Form
         gridCard.Dock = DockStyle.Fill;
         gridBody.Controls.Add(_grid);
         gridBody.Controls.Add(_flagPanel);
+        gridBody.Controls.Add(_lblAxisInfo);
         gridBody.Controls.Add(_lblTableInfo);
 
         _hex = new HexViewerControl { Dock = DockStyle.Fill, Data = _data };
@@ -325,6 +328,7 @@ public class EditorForm : Form
         if (table == null)
         {
             _lblTableInfo.Text = "";
+            _lblAxisInfo.Text = "";
             _grid.Rows.Clear();
             _grid.Columns.Clear();
             _hex.SetHighlight(-1, 0);
@@ -332,6 +336,7 @@ public class EditorForm : Form
         }
 
         _lblTableInfo.Text = $"{table.Name}    ตำแหน่ง=0x{table.Offset:X}    ขนาด {table.Rows}x{table.Cols}    {table.ElementSizeBits}-bit {(table.Signed ? "มีเครื่องหมาย" : "ไม่มีเครื่องหมาย")}    หน่วย={table.Unit}    สมการ: ค่าดิบ -> {table.MathEquation}";
+        _lblAxisInfo.Text = DescribeAxes(table);
         _hex.SetHighlight(table.Offset, table.TotalByteLength);
         _hex.ScrollToOffset(table.Offset);
         RefreshGridFromData();
@@ -428,7 +433,28 @@ public class EditorForm : Form
         _suppressGridEvents = false;
     }
 
-    private string AxisHeader(AxisDef? axis, int index) => AxisValue(axis, index).ToString("0.##");
+    /// <summary>RPM breakpoints are always whole numbers on real Honda ECUs — round the display so
+    /// tiny raw/equation rounding noise (e.g. 9199.88) doesn't show up as fake precision (TunerPro shows 9200).
+    /// TPS breakpoints are genuinely fractional (%), so those keep decimal formatting.</summary>
+    private string AxisHeader(AxisDef? axis, int index)
+    {
+        double val = AxisValue(axis, index);
+        bool isRpm = axis?.Label.Contains("RPM", StringComparison.OrdinalIgnoreCase) == true;
+        return isRpm ? Math.Round(val).ToString("0") : val.ToString("0.##");
+    }
+
+    /// <summary>One-line hint above the grid stating which axis is which, e.g. "แถว = รอบเครื่องยนต์ RPM".</summary>
+    private static string DescribeAxes(TableDef table)
+    {
+        if (table.XAxis == null && table.YAxis == null) return "";
+        bool yIsRpm = table.YAxis?.Label.Contains("RPM", StringComparison.OrdinalIgnoreCase) == true;
+        bool xIsTps = table.XAxis?.Label.Contains("TPS", StringComparison.OrdinalIgnoreCase) == true;
+
+        string? rowPart = table.YAxis == null ? null : yIsRpm ? "แถว = รอบเครื่องยนต์ (RPM)" : $"แถว = {table.YAxis.Label}";
+        string? colPart = table.XAxis == null ? null : xIsTps ? "คอลัมน์ = ค่าคันเร่ง (TPS %)" : $"คอลัมน์ = {table.XAxis.Label}";
+
+        return string.Join("        ", new[] { rowPart, colPart }.Where(s => !string.IsNullOrEmpty(s)));
+    }
 
     /// <summary>Real-world axis value (RPM/TPS/etc.) at a row/column index — used for headers and for
     /// weighting the Interpolate X/Y/XY functions by actual breakpoint position, not raw index.</summary>
