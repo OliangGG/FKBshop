@@ -35,6 +35,12 @@ public class EditorForm : Form
     private byte[]? _compareData;
     private string? _compareLabel;
 
+    private Label _lblZoom = null!;
+    private double _gridZoom = 0.75;
+    private const float BaseCellFontSize = 8.5f;
+    private const int BaseRowHeight = 22;
+    private const int BaseColWidth = 56;
+
     private const string FnOffset = "บวก/ลบค่า (Offset)";
     private const string FnMultiply = "คูณค่า (Multiply)";
     private const string FnDivide = "หารค่า (Divide)";
@@ -109,6 +115,7 @@ public class EditorForm : Form
         _grid.RowHeadersDefaultCellStyle.Font = new Font(Theme.UiFont, FontStyle.Bold);
         _grid.EnableHeadersVisualStyles = false;
         _grid.CellEndEdit += Grid_CellEndEdit;
+        _grid.MouseWheel += Grid_MouseWheel;
 
         _lblTableInfo = new Label { Dock = DockStyle.Top, Height = 26, BackColor = Theme.HeaderBar, ForeColor = Theme.Silver, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
         _lblAxisInfo = new Label { Dock = DockStyle.Top, Height = 22, BackColor = Theme.HeaderBar, ForeColor = Theme.Accent, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 0, 0) };
@@ -268,10 +275,25 @@ public class EditorForm : Form
             Location = new Point(600, 60),
         };
 
+        var btnZoomOut = Theme.StyledButton("ย่อ  −");
+        btnZoomOut.Location = new Point(1000, 55);
+        btnZoomOut.Click += (_, _) => ApplyGridZoom(_gridZoom / 1.15);
+
+        var btnZoomIn = Theme.StyledButton("ขยาย  +");
+        btnZoomIn.Location = new Point(1070, 55);
+        btnZoomIn.Click += (_, _) => ApplyGridZoom(_gridZoom * 1.15);
+
+        var btnFit = Theme.StyledButton("พอดีหน้าจอ");
+        btnFit.Location = new Point(1150, 55);
+        btnFit.Click += (_, _) => FitGridToWindow();
+
+        _lblZoom = new Label { Text = "75%", AutoSize = true, ForeColor = Theme.TextMuted, Location = new Point(1250, 60) };
+
         bar.Controls.AddRange(new Control[]
         {
             btnSaveAs, btnUndo, btnRedo, btnManual, btnLoadCompare, lblCompare, chkShowHex, btn3DGraph, btnAfrAdvisor,
             lblFn, cmbFunction, lblVal, txtValue, btnExecute, lblHint,
+            btnZoomOut, btnZoomIn, btnFit, _lblZoom,
         });
         return bar;
     }
@@ -442,6 +464,51 @@ public class EditorForm : Form
         }
 
         _suppressGridEvents = false;
+        ApplyGridZoom(_gridZoom);
+    }
+
+    /// <summary>Intercepts Ctrl+scroll on the grid for zoom instead of the normal vertical scroll.</summary>
+    private void Grid_MouseWheel(object? sender, MouseEventArgs e)
+    {
+        if (!ModifierKeys.HasFlag(Keys.Control)) return;
+
+        if (e is HandledMouseEventArgs hme) hme.Handled = true;
+        ApplyGridZoom(_gridZoom * (e.Delta > 0 ? 1.15 : 1 / 1.15));
+    }
+
+    /// <summary>Scales cell/header font size, row height, and column width together so the grid feels "zoomed".</summary>
+    private void ApplyGridZoom(double zoom)
+    {
+        zoom = Math.Clamp(zoom, 0.3, 2.5);
+        _gridZoom = zoom;
+
+        float fontSize = (float)(BaseCellFontSize * zoom);
+        _grid.DefaultCellStyle.Font = new Font(Theme.UiFont.FontFamily, fontSize);
+        _grid.ColumnHeadersDefaultCellStyle.Font = new Font(Theme.UiFont.FontFamily, fontSize, FontStyle.Bold);
+        _grid.RowHeadersDefaultCellStyle.Font = new Font(Theme.UiFont.FontFamily, fontSize, FontStyle.Bold);
+
+        int rowHeight = Math.Max(14, (int)(BaseRowHeight * zoom));
+        _grid.RowTemplate.Height = rowHeight;
+        foreach (DataGridViewRow row in _grid.Rows) row.Height = rowHeight;
+
+        int colWidth = Math.Max(26, (int)(BaseColWidth * zoom));
+        foreach (DataGridViewColumn col in _grid.Columns) col.Width = colWidth;
+
+        if (_lblZoom != null) _lblZoom.Text = $"{zoom * 100:0}%";
+    }
+
+    /// <summary>Picks the zoom level that fits every row and column of the current table in the visible grid area at once.</summary>
+    private void FitGridToWindow()
+    {
+        if (_grid.Columns.Count == 0 || _grid.Rows.Count == 0) return;
+
+        int availW = _grid.ClientSize.Width - 70; // leave room for row headers + scrollbar
+        int availH = _grid.ClientSize.Height - 40; // leave room for column headers + scrollbar
+        if (availW <= 0 || availH <= 0) return;
+
+        double zoomW = (double)availW / (_grid.Columns.Count * BaseColWidth);
+        double zoomH = (double)availH / (_grid.Rows.Count * BaseRowHeight);
+        ApplyGridZoom(Math.Min(zoomW, zoomH));
     }
 
     /// <summary>Builds the current table's value/axis matrices and opens them in a rotatable 3D graph window.</summary>
