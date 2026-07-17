@@ -1,0 +1,21 @@
+{
+  "ecuId": "0106A70D01",
+  "partNumber": "30400-K3MH-T71",
+  "notes": "Addresses confirmed by reading TunerPro RT's Table Properties dialog (Address/Rows/Columns/Conversion tabs) and cross-checking raw bytes in the stock .bin against the values TunerPro displayed. Only tables verified this way belong in this file — do not add guessed offsets here.",
+  "tables": [
+    {
+      "name": "TPS vs RPM Load - หลัก",
+      "category": "Fuel",
+      "offset": "0x3A078",
+      "rows": 35,
+      "cols": 29,
+      "elementSizeBits": 16,
+      "signed": false,
+      "bigEndian": false,
+      "mathEquation": "X/1000",
+      "unit": "",
+      "decimalPlaces": 3,
+      "verified": "byte-exact match against TunerPro screenshot values (row RPM=1000 and RPM=1200, cols TPS 0.0-6.0) and TunerPro's General/Rows/Columns/Conversion tabs for XDF ID 9203"
+    }
+  ]
+}

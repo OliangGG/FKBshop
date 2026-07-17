@@ -1,5 +1,6 @@
 using BinTuner.BinIO;
 using BinTuner.Models;
+using BinTuner.Presets;
 using BinTuner.Xdf;
 
 namespace BinTuner.UI;
@@ -20,7 +21,7 @@ public class MainForm : Form
         Text = "BinTuner (prototype) — Honda ECU .bin/.xdf editor";
         Theme.Apply(this);
         Width = 560;
-        Height = 300;
+        Height = 340;
         StartPosition = FormStartPosition.CenterScreen;
 
         var lblTitle = new Label
@@ -40,11 +41,15 @@ public class MainForm : Form
         btnOpenXdf.Location = new Point(16, 96);
         btnOpenXdf.Click += (_, _) => OpenXdf();
 
+        var btnLoadPreset = Theme.StyledButton("โหลด Preset ที่ยืนยันแล้ว...");
+        btnLoadPreset.Location = new Point(16, 136);
+        btnLoadPreset.Click += (_, _) => LoadPreset();
+
         _lblBin = new Label { Text = "BIN: (ยังไม่ได้เปิด)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(220, 62) };
-        _lblXdf = new Label { Text = "XDF: (ยังไม่ได้เปิด)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(220, 102) };
+        _lblXdf = new Label { Text = "XDF/Preset: (ยังไม่ได้เปิด)", ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(220, 102) };
 
         _btnOpenEditor = Theme.StyledButton("เปิดตัวแก้ตาราง (Editor)");
-        _btnOpenEditor.Location = new Point(16, 150);
+        _btnOpenEditor.Location = new Point(16, 190);
         _btnOpenEditor.Enabled = false;
         _btnOpenEditor.Click += (_, _) => OpenEditor();
 
@@ -54,10 +59,10 @@ public class MainForm : Form
                    "ไฟล์ที่ Save As ออกมาจากที่นี่ \"ห้าม flash\" เข้า ECU จริง",
             ForeColor = Color.FromArgb(210, 170, 60),
             AutoSize = true,
-            Location = new Point(16, 200),
+            Location = new Point(16, 240),
         };
 
-        Controls.AddRange(new Control[] { lblTitle, btnOpenBin, btnOpenXdf, _lblBin, _lblXdf, _btnOpenEditor, lblWarn });
+        Controls.AddRange(new Control[] { lblTitle, btnOpenBin, btnOpenXdf, btnLoadPreset, _lblBin, _lblXdf, _btnOpenEditor, lblWarn });
     }
 
     private void OpenBin()
@@ -95,6 +100,33 @@ public class MainForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, $"อ่านไฟล์ XDF ไม่สำเร็จ:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void LoadPreset()
+    {
+        string presetsDir = Path.Combine(AppContext.BaseDirectory, "Presets");
+        using var dlg = new OpenFileDialog
+        {
+            Filter = "BinTuner preset (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = Directory.Exists(presetsDir) ? presetsDir : AppContext.BaseDirectory,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var preset = PresetLoader.Load(dlg.FileName);
+            _xdf ??= new ParsedXdf();
+            _xdf.EcuId = preset.EcuId;
+            _xdf.PartNumber = preset.PartNumber;
+            _xdf.Tables.AddRange(preset.Tables);
+            _lblXdf.Text = $"XDF/Preset: {Path.GetFileName(dlg.FileName)} ({_xdf.Tables.Count} parameters รวม)";
+            _lblXdf.ForeColor = Theme.Silver;
+            UpdateEditorButton();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"โหลด preset ไม่สำเร็จ:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

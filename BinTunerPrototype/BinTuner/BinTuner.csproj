@@ -11,4 +11,8 @@
     <AssemblyName>BinTuner</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Include="Presets\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
